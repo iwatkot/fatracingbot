@@ -1,0 +1,7 @@
+.venv/
+*.env
+logs/
+__pycache__/
+.flake8
+*.html
+.DS_Store
