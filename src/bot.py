@@ -51,6 +51,12 @@ class Messages(Enum):
     WRONG_BIRTHDAY = "Неверный формат. Пожалуйста, введите вашу дату рождения."
     WRONG_PHONE = "Неверный формат. Пожалуйста, введите ваш номер телефона."
 
+    USER_INFO = (
+        "`Имя:` {first_name}\n`Фамилия:` {last_name}\n"
+        "`Пол:` {gender}\n`Дата рождения:` {birthday}\n"
+        "`Email:` {email}\n`Телефон:` {phone}\n"
+    )
+
     def format(self, *args, **kwargs):
         return escape(self.value.format(*args, **kwargs))
 
@@ -155,6 +161,51 @@ async def button_account_new(message: types.Message):
     dp.register_message_handler(register)
 
 
+@dp.message_handler(Text(equals=Buttons.BTN_ACCOUNT_INFO.value))
+async def button_account_info(message: types.Message):
+    await log_event(message)
+
+    user = await get_user_json(message.from_user.id)
+    if not user:
+        return
+
+    reply = escape("Ваши данные:\n\n") + Messages.USER_INFO.format(**user)
+
+    await bot.send_message(
+        message.from_user.id,
+        reply,
+        parse_mode="MarkdownV2",
+    )
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_ACCOUNT_EDIT.value))
+async def button_account_edit(message: types.Message):
+    await log_event(message)
+
+    user = await get_user_json(message.from_user.id)
+    if not user:
+        return
+
+    buttons = {}
+
+    for key, value in user.items():
+        if key == "telegram_id":
+            continue
+        if value is None:
+            if key == "email":
+                value = "указать email"
+            elif key == "phone":
+                value = "указать телефон"
+        buttons[key] = value
+
+    reply_markup = await keyboard(buttons)
+    reply = escape("Выберите поле для редактирования:\n\n")
+
+    await bot.send_message(
+        message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
+    )
+
+
 @dp.message_handler(content_types=types.ContentType.LOCATION)
 async def first_location(message: types.Message):
     # the user's location is in message.location
@@ -230,21 +281,24 @@ async def register(message: types.Message):
 
     elif "email" in user:
         if message.text == Buttons.BTN_SKIP.value:
+            show_preview = True
             user["phone"] = None
+
+        elif await is_phone_number(message.text) is not True:
+            show_preview = False
+            reply = Messages.WRONG_PHONE.escaped()
+            reply_markup = await keyboard(Buttons.MN_REG.value)
+        else:
+            show_preview = True
+            user["phone"] = message.text
+
+        if show_preview:
             reply = escape(
-                f"Проверьте правильность введенных данных:\n\n"
-                f"`Имя:` {user['first_name']}\n`Фамилия:` {user['last_name']}\n"
-                f"`Пол:` {user['gender']}\n`Дата рождения:` {user['birthday']}\n"
-                f"`Email:` {user['email']}\n`Телефон:` {user['phone']}\n\n"
-            )
+                "Проверьте правильность введенных данных:\n\n"
+            ) + Messages.USER_INFO.format(**user)
 
             reply_markup = await keyboard(Buttons.MN_REG_CONFIRM.value)
-        else:
-            if await is_phone_number(message.text) is not True:
-                reply = Messages.WRONG_PHONE.escaped()
-                reply_markup = await keyboard(Buttons.MN_REG.value)
-            else:
-                user["phone"] = message.text
+
     elif "birthday" in user:
         reply = Messages.REG_PHONE.escaped()
         reply_markup = await keyboard(Buttons.MN_REG.value)
@@ -288,6 +342,20 @@ async def register(message: types.Message):
 
 
 # Utility functions.
+
+
+async def get_user_json(telegram_id):
+    user = await db.get_user(telegram_id)
+    if not user:
+        return
+
+    user = user.to_mongo()
+    user["email"] = user.get("email")
+    user["phone"] = user.get("phone")
+    user["birthday"] = user.get("birthday").strftime("%Y-%m-%d")
+    user.pop("_id")
+
+    return user
 
 
 async def is_phone_number(phone: str):
