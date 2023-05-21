@@ -57,6 +57,9 @@ class Messages(Enum):
         "`Email:` {email}\n`Телефон:` {phone}\n"
     )
 
+    EDIT_CANCELLED = "Редактирование отменено."
+    EDIT_SUCCESS = "Редактирование успешно завершено."
+
     def format(self, *args, **kwargs):
         return escape(self.value.format(*args, **kwargs))
 
@@ -196,6 +199,7 @@ async def button_account_edit(message: types.Message):
                 value = "указать email"
             elif key == "phone":
                 value = "указать телефон"
+        key = f"user_edit_{key}"
         buttons[key] = value
 
     reply_markup = await keyboard(buttons)
@@ -242,7 +246,113 @@ def save_map(coords):
     m.save("map.html")
 
 
+# Callback handlers.
+
+
+@dp.callback_query_handler(text_contains="user_edit_")
+async def callback_user_edit(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    query = callback_query.data
+    reply_markup = await keyboard([Buttons.BTN_CANCEL.value])
+
+    if query.endswith("first_name"):
+        reply = Messages.REG_FIRST_NAME.escaped()
+        field = "first_name"
+    elif query.endswith("last_name"):
+        reply = Messages.REG_LAST_NAME.escaped()
+        field = "last_name"
+    elif query.endswith("gender"):
+        reply = Messages.REG_GENDER.escaped()
+        reply_markup = await keyboard(Buttons.GENDERS.value)
+        field = "gender"
+    elif query.endswith("birthday"):
+        reply = Messages.REG_BIRTHDAY.escaped()
+        field = "birthday"
+    elif query.endswith("email"):
+        reply = Messages.REG_EMAIL.escaped()
+        field = "email"
+    elif query.endswith("phone"):
+        reply = Messages.REG_PHONE.escaped()
+        field = "phone"
+    else:
+        return
+
+    g.AppState.user_edit_field = field
+    dp.register_message_handler(edit_user)
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        reply,
+        parse_mode="MarkdownV2",
+        reply_markup=reply_markup,
+    )
+
+
 # Registered handlers.
+
+
+async def edit_user(message: types.Message):
+    await log_event(message)
+
+    if message.text == Buttons.BTN_CANCEL.value:
+        dp.message_handlers.unregister(edit_user)
+
+        await bot.send_message(message.from_user.id, Messages.EDIT_CANCELLED.value)
+        await button_main(message)
+
+        return
+
+    unregister_handler = False
+    field = g.AppState.user_edit_field
+
+    if field == "first_name":
+        if message.text.isalpha():
+            unregister_handler = True
+            value = message.text
+        else:
+            reply = Messages.WRONG_NAME.escaped()
+    elif field == "last_name":
+        if message.text.isalpha():
+            unregister_handler = True
+            value = message.text
+        else:
+            reply = Messages.WRONG_NAME.escaped()
+    elif field == "gender":
+        if message.text in Buttons.GENDERS.value:
+            unregister_handler = True
+            value = message.text
+        else:
+            reply = Messages.WRONG_GENDER.escaped()
+    elif field == "birthday":
+        try:
+            date = datetime.strptime(message.text, "%d.%m.%Y").date()
+            value = date
+            unregister_handler = True
+        except ValueError:
+            reply = Messages.WRONG_BIRTHDAY.escaped()
+    elif field == "email":
+        if validators.email(message.text) is True:
+            unregister_handler = True
+            value = message.text
+        else:
+            reply = Messages.WRONG_EMAIL.escaped()
+    elif field == "phone":
+        if await is_phone_number(message.text):
+            unregister_handler = True
+            value = message.text
+        else:
+            reply = Messages.WRONG_PHONE.escaped()
+
+    if unregister_handler:
+        dp.message_handlers.unregister(edit_user)
+
+        await db.update_user(message.from_user.id, **{field: value})
+
+        await bot.send_message(message.from_user.id, Messages.EDIT_SUCCESS.value)
+        await button_main(message)
+    else:
+        await bot.send_message(message.from_user.id, reply, parse_mode="MarkdownV2")
 
 
 async def register(message: types.Message):

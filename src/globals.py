@@ -73,6 +73,7 @@ class State:
         self.DataBase = self.DataBase()
 
         self.user_data = {}
+        self.user_edit_field = None
 
 
 logger = Logger(__name__)

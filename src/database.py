@@ -47,5 +47,26 @@ async def get_user_by_fatracing_id(fatracing_id):
     return User.objects(fatracing_id=fatracing_id).first()
 
 
+async def update_user(telegram_id, **kwargs):
+    user = User.objects(telegram_id=telegram_id).first()
+
+    if user:
+        logger.debug(
+            f"User with telegram id {telegram_id} is found in the database. "
+            f"Trying to update the user with data: {kwargs}."
+        )
+        user.update(**kwargs)
+        user.reload()
+
+        logger.debug(f"User with telegram id {telegram_id} successfully updated.")
+    else:
+        logger.warning(
+            f"User with telegram id {telegram_id} wasn't found in the database."
+        )
+
+    return user
+
+
 async def new_user(**kwargs):
+    logger.debug(f"Trying to create a new user with data: {kwargs}.")
     return User(**kwargs).save()
