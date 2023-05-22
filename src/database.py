@@ -1,4 +1,13 @@
-from mongoengine import connect, Document, StringField, DateField, IntField
+from datetime import datetime
+
+from mongoengine import (
+    connect,
+    Document,
+    StringField,
+    IntField,
+    ListField,
+    FloatField,
+)
 
 import globals as g
 
@@ -24,10 +33,22 @@ class User(Document):
     last_name = StringField(required=True)
 
     gender = StringField(required=True)
-    birthday = DateField(required=True)
+    birthday = StringField(required=True)
 
     email = StringField()
     phone = StringField()
+
+
+class Race(Document):
+    name = StringField(required=True)
+    date = StringField(required=True)
+    time = StringField(required=True)
+
+    categories = ListField(StringField(required=True))
+
+    distance = FloatField(required=True)
+
+    price = IntField(required=True)
 
 
 async def get_user(telegram_id):
@@ -70,3 +91,33 @@ async def update_user(telegram_id, **kwargs):
 async def new_user(**kwargs):
     logger.debug(f"Trying to create a new user with data: {kwargs}.")
     return User(**kwargs).save()
+
+
+async def get_race_by_date(date: datetime.date = None):
+    if not date:
+        date = datetime.today().strftime("%d.%m.%Y")
+    logger.debug(f"Trying to find event for date: {date}.")
+
+    race = Race.objects(date=date).first()
+
+    if race:
+        logger.debug(f"Found a {race.name} event for date: {date}.")
+    else:
+        logger.debug(f"Didn't find any event for date: {date}.")
+
+    return race
+
+
+categories = ["М: CX / Gravel", "M: Road", "Ж: CX / Gravel", "Ж: Road"]
+
+
+new_race = {
+    "name": "Тестовая гонка",
+    "date": "22.05.2023",
+    "time": "14:00",
+    "categories": categories,
+    "distance": 50.2,
+    "price": 1000,
+}
+
+# Race(**new_race).save()

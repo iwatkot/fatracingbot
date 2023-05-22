@@ -60,6 +60,8 @@ class Messages(Enum):
     EDIT_CANCELLED = "Редактирование отменено."
     EDIT_SUCCESS = "Редактирование успешно завершено."
 
+    NO_RACE = "Сегодня не проводится ни одной гонки."
+
     def format(self, *args, **kwargs):
         return escape(self.value.format(*args, **kwargs))
 
@@ -73,6 +75,7 @@ class Buttons(Enum):
     BTN_CONFIRM = "Подтвердить"
 
     BTN_ACCOUNT = "Личный кабинет"
+    BTN_DURING_RACE = "Во время гонки"
     BTN_EVENTS = "Мероприятия"
     BTN_INFO = "Информация"
     BTN_MAIN = "Главное меню"
@@ -86,15 +89,40 @@ class Buttons(Enum):
     BTN_GENDER_F = "Женский"
     GENDERS = [BTN_GENDER_M, BTN_GENDER_F]
 
-    MN_MAIN_USER = [BTN_ACCOUNT, BTN_EVENTS, BTN_INFO, BTN_ADMIN]
-    MN_MAIN_ADMIN = [BTN_ACCOUNT, BTN_EVENTS, BTN_INFO, BTN_ADMIN, BTN_ADMIN]
+    BTN_TRANSLATION = "Трансляция геолокации"
+    BTN_LEADERBOARD = "Таблица лидеров"
+    BTN_YOUR_STATUS = "Ваши показатели"
+    BTN_NEED_HELP = "Мне нужна помощь"
+
+    MN_MAIN_USER = [BTN_ACCOUNT, BTN_DURING_RACE, BTN_EVENTS, BTN_INFO, BTN_ADMIN]
+    MN_MAIN_ADMIN = [
+        BTN_ACCOUNT,
+        BTN_DURING_RACE,
+        BTN_EVENTS,
+        BTN_INFO,
+        BTN_ADMIN,
+        BTN_ADMIN,
+    ]
 
     MN_ACCOUNT_NEW = [BTN_ACCOUNT_NEW, BTN_MAIN]
     MN_ACCOUNT_EXIST = [BTN_ACCOUNT_INFO, BTN_ACCOUNT_EDIT, BTN_MAIN]
 
+    MN_DURING_RACE = [
+        BTN_TRANSLATION,
+        BTN_LEADERBOARD,
+        BTN_YOUR_STATUS,
+        BTN_NEED_HELP,
+        BTN_MAIN,
+    ]
+
     MN_REG = [BTN_CANCEL, BTN_SKIP]
     MN_REG_GENDER = [BTN_GENDER_M, BTN_GENDER_F, BTN_CANCEL]
     MN_REG_CONFIRM = [BTN_CONFIRM, BTN_CANCEL]
+
+
+#####################################
+##### * Handlers for /commands ######
+#####################################
 
 
 @dp.message_handler(commands=["start"])
@@ -109,6 +137,11 @@ async def test(message: types.Message):
     await bot.send_message(
         message.from_user.id, Messages.START.value, reply_markup=reply_markup
     )
+
+
+#####################################
+#### * Handlers for menu buttons ####
+#####################################
 
 
 @dp.message_handler(Text(equals=Buttons.BTN_MAIN.value))
@@ -145,6 +178,25 @@ async def button_account(message: types.Message):
     )
 
 
+@dp.message_handler(Text(equals=Buttons.BTN_DURING_RACE.value))
+async def button_during_race(message: types.Message()):
+    await log_event(message)
+
+    reply_markup = await keyboard(Buttons.MN_DURING_RACE.value)
+
+    await bot.send_message(
+        message.from_user.id,
+        Messages.MENU_CHANGED.format(message.text),
+        reply_markup=reply_markup,
+        parse_mode="MarkdownV2",
+    )
+
+
+#####################################
+#### * Account buttons handlers #####
+#####################################
+
+
 @dp.message_handler(Text(equals=Buttons.BTN_ACCOUNT_NEW.value))
 async def button_account_new(message: types.Message):
     await log_event(message)
@@ -171,6 +223,10 @@ async def button_account_info(message: types.Message):
     user = await get_user_json(message.from_user.id)
     if not user:
         return
+
+    for key, value in user.items():
+        if not value:
+            user[key] = "не указан"
 
     reply = escape("Ваши данные:\n\n") + Messages.USER_INFO.format(**user)
 
@@ -210,6 +266,40 @@ async def button_account_edit(message: types.Message):
     )
 
 
+#####################################
+## * During race buttons handlers ###
+#####################################
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_TRANSLATION.value))
+async def button_translation(message: types.Message):
+    await log_event(message)
+
+    race = await db.get_race_by_date()
+
+    if not race:
+        await bot.send_message(message.from_user.id, Messages.NO_RACE.value)
+        return
+
+    race = race.to_mongo()
+
+    reply = escape(
+        f"Сегодня проводится гонка  `{race['name']}`\n\n"
+        f"Старт:  `{race['time']}` \nДистанция:  `{race['distance']} км`"
+    )
+
+    await bot.send_message(message.from_user.id, reply, parse_mode="MarkdownV2")
+
+    # ! TODO: Check if user is registered for the specified event
+
+    pass
+
+
+#####################################
+####### ! Just test functions #######
+#####################################
+
+
 @dp.message_handler(content_types=types.ContentType.LOCATION)
 async def first_location(message: types.Message):
     # the user's location is in message.location
@@ -246,7 +336,9 @@ def save_map(coords):
     m.save("map.html")
 
 
-# Callback handlers.
+#####################################
+######## * Callback handlers ########
+#####################################
 
 
 @dp.callback_query_handler(text_contains="user_edit_")
@@ -289,7 +381,9 @@ async def callback_user_edit(callback_query: types.CallbackQuery):
     )
 
 
-# Registered handlers.
+#####################################
+####### * Registered handlers #######
+#####################################
 
 
 async def edit_user(message: types.Message):
@@ -325,11 +419,10 @@ async def edit_user(message: types.Message):
         else:
             reply = Messages.WRONG_GENDER.escaped()
     elif field == "birthday":
-        try:
-            date = datetime.strptime(message.text, "%d.%m.%Y").date()
-            value = date
+        if await is_date(message.text):
+            value = message.text
             unregister_handler = True
-        except ValueError:
+        else:
             reply = Messages.WRONG_BIRTHDAY.escaped()
     elif field == "email":
         if validators.email(message.text) is True:
@@ -420,12 +513,11 @@ async def register(message: types.Message):
         else:
             user["email"] = message.text
     elif "gender" in user:
-        try:
-            date = datetime.strptime(message.text, "%d.%m.%Y").date()
-            user["birthday"] = date
+        if await is_date(message.text):
+            user["birthday"] = message.text
             reply = Messages.REG_EMAIL.escaped()
             reply_markup = await keyboard(Buttons.MN_REG.value)
-        except ValueError:
+        else:
             reply = Messages.WRONG_BIRTHDAY.escaped()
             reply_markup = await keyboard([Buttons.BTN_CANCEL.value])
 
@@ -451,7 +543,9 @@ async def register(message: types.Message):
     )
 
 
-# Utility functions.
+#####################################
+######## * Utility functions ########
+#####################################
 
 
 async def get_user_json(telegram_id):
@@ -462,7 +556,6 @@ async def get_user_json(telegram_id):
     user = user.to_mongo()
     user["email"] = user.get("email")
     user["phone"] = user.get("phone")
-    user["birthday"] = user.get("birthday").strftime("%Y-%m-%d")
     user.pop("_id")
 
     return user
@@ -474,11 +567,18 @@ async def is_phone_number(phone: str):
     return res is not None
 
 
+async def is_date(date: str):
+    try:
+        datetime.strptime(date, "%d.%m.%Y")
+        return True
+    except ValueError:
+        return False
+
+
 async def keyboard(buttons: list | dict):
     if isinstance(buttons, list):
         keyboard = ReplyKeyboardMarkup(
             resize_keyboard=True,
-            row_width=2,
         )
         for button in buttons:
             keyboard.add(KeyboardButton(button))
