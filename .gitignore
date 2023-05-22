@@ -5,3 +5,4 @@ __pycache__/
 .flake8
 *.html
 .DS_Store
+tmp/

@@ -1,11 +1,16 @@
+import io
+import os
+
 from enum import Enum
 from re import escape, match
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.dispatcher.filters import Text
+from aiocron import crontab
+from PIL import Image
 
 import folium
 import validators
@@ -18,11 +23,6 @@ logger = g.Logger(__name__)
 bot = Bot(token=g.AppState.Bot.token)
 
 dp = Dispatcher(bot=bot)
-
-latitude = 36.6277
-longitude = 31.765989
-
-m = folium.Map(location=[latitude, longitude], zoom_start=13)
 
 
 class Messages(Enum):
@@ -61,6 +61,29 @@ class Messages(Enum):
     EDIT_SUCCESS = "Редактирование успешно завершено."
 
     NO_RACE = "Сегодня не проводится ни одной гонки."
+
+    TRANSLATION_REQUEST = (
+        "\n\nМы  `убедительно просим`  всех участников  `включить трансляцию геолокации`  на время гонки. "
+        "Благодаря этому зрители смогут следить за положением гонщиков на "
+        "карте в реальном времени. Помимо этого, в случае возникновения "
+        "проблем, организаторы смогут быстрее оказать вам помощь.\n\n"
+        "Большое спасибо."
+    )
+
+    TRANSLATION_TOOLTIP = (
+        "Пожалуйста, убедитесь что Telegram на вашем устройстве, может  получать вашу геолокацию в  `фоновом режиме`. "
+        "После этого начните трансляцию геолокации для бота.\n"
+        "Бот ответит вам только на начало трансляции, затем данные будут использованы для обновления "
+        "вашего положения на карте и таблице лидеров."
+    )
+    TRANSLATION_LIVE = (
+        "Бот начал получать ваши геоданные. Убедитесь, что Telegram может получать вашу "
+        "геолокацию в  `фоновом режиме`  и  `не отключайте трансляцию`  до окончания гонки. Спасибо."
+    )
+    TRANSLATION_NOT_LIVE = (
+        "Вы прислали боту свое местоположение, но  `не включили трансляцию`  геолокации. "
+        "Пожалуйста, включите трансляцию геолокации, иначе бот не сможет получать ваши данные."
+    )
 
     def format(self, *args, **kwargs):
         return escape(self.value.format(*args, **kwargs))
@@ -227,6 +250,8 @@ async def button_account_info(message: types.Message):
     for key, value in user.items():
         if not value:
             user[key] = "не указан"
+        if key == "birthday":
+            user[key] = value.strftime("%d.%m.%Y")
 
     reply = escape("Ваши данные:\n\n") + Messages.USER_INFO.format(**user)
 
@@ -250,6 +275,10 @@ async def button_account_edit(message: types.Message):
     for key, value in user.items():
         if key == "telegram_id":
             continue
+
+        if key == "birthday":
+            value = value.strftime("%d.%m.%Y")
+
         if value is None:
             if key == "email":
                 value = "указать email"
@@ -285,55 +314,107 @@ async def button_translation(message: types.Message):
 
     reply = escape(
         f"Сегодня проводится гонка  `{race['name']}`\n\n"
-        f"Старт:  `{race['time']}` \nДистанция:  `{race['distance']} км`"
+        f"Старт:  `{race['datetime']}` \nДистанция:  `{race['distance']} км`"
     )
 
-    await bot.send_message(message.from_user.id, reply, parse_mode="MarkdownV2")
+    #####################################
+    #### ! TODO: add check if user ######
+    #### ! registered for the event #####
+    # ? if not await db.is_registered_for_event(telegram_id, race_name):
+    # ?     await bot.send_message(...
+    # ?     return
+    #####################################
 
-    # ! TODO: Check if user is registered for the specified event
+    reply += Messages.TRANSLATION_REQUEST.escaped()
+    reply_markup = await keyboard({"location_translation": "Трансляция геолокации"})
 
-    pass
+    await bot.send_message(
+        message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
+    )
 
 
 #####################################
-####### ! Just test functions #######
+####### * Location handlers #########
 #####################################
 
 
 @dp.message_handler(content_types=types.ContentType.LOCATION)
-async def first_location(message: types.Message):
-    # the user's location is in message.location
-    user_location = message.location
-
-    # Check if it's a live location
+async def translation_started(message: types.Message):
     if message.location.live_period:
+        logger.info(f"User {message.from_user.id} started live location translation.")
+
         await bot.send_message(
             chat_id=message.from_user.id,
-            text=f"FIRST = LIVE: Your location is {user_location.latitude}, {user_location.longitude}",
+            text=Messages.TRANSLATION_LIVE.escaped(),
+            parse_mode="MarkdownV2",
         )
     else:
-        await message.reply(
-            f"NOT LIVE: Your location is {user_location.latitude}, {user_location.longitude}"
+        logger.warning(f"User {message.from_user.id} sent NOT live location.")
+
+        await bot.send_message(
+            chat_id=message.from_user.id,
+            text=Messages.TRANSLATION_NOT_LIVE.escaped(),
+            parse_mode="MarkdownV2",
         )
 
 
 @dp.edited_message_handler(content_types=types.ContentType.LOCATION)
-async def edited_location(message: types.Message):
-    user_location = message.location
+async def translation(message: types.Message):
+    if not message.location.live_period:
+        return
 
-    if message.location.live_period:
-        await bot.send_message(
-            chat_id=message.from_user.id,
-            text=f"EDITED = LIVE: Your location is {user_location.latitude}, {user_location.longitude}",
-        )
+    logger.info(
+        f"User {message.from_user.id} sent live location. "
+        f"Lat: {message.location.latitude}, Lon: {message.location.longitude}"
+    )
 
-        coords = [user_location.latitude, user_location.longitude]
-        save_map(coords)
+    g.AppState.location_data[message.from_user.id] = [
+        message.location.latitude,
+        message.location.longitude,
+    ]
+
+    logger.debug(
+        f"Saved location data for user {message.from_user.id} in global state."
+    )
 
 
-def save_map(coords):
-    folium.Marker(coords, popup="ya pidoras").add_to(m)
-    m.save("map.html")
+#####################################
+######## * Crontab handlers #########
+#####################################
+
+LAT = 36.6277
+LON = 31.765989
+
+
+@crontab(g.MAP_TICKRATE)
+async def map_update():
+    logger.debug("Crontab rule started...")
+
+    if not g.AppState.location_data:
+        return
+
+    #####################################
+    ### ? MOSTLY FOR DEBUGGING PURPOSE ##
+    #####################################
+
+    m = folium.Map(location=[LAT, LON], zoom_start=13)
+    for telegram_id, coords in g.AppState.location_data.items():
+        folium.Marker(coords, popup=telegram_id).add_to(m)
+
+    logger.debug(f"Map created, added {len(g.AppState.location_data)} markers.")
+
+    img_data = m._to_png(5)
+    img = Image.open(io.BytesIO(img_data))
+
+    img_path = os.path.join(g.TMP_DIR, "map.png")
+
+    img.save(img_path)
+
+    logger.debug(f"Map image saved to {img_path}, trying to send...")
+
+    photo = InputFile(img_path)
+
+    await bot.send_photo(g.DEBUG_CHAT_ID, photo)
 
 
 #####################################
@@ -381,6 +462,17 @@ async def callback_user_edit(callback_query: types.CallbackQuery):
     )
 
 
+@dp.callback_query_handler(text_contains="location_translation")
+async def callback_location_translation(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        Messages.TRANSLATION_TOOLTIP.escaped(),
+        parse_mode="MarkdownV2",
+    )
+
+
 #####################################
 ####### * Registered handlers #######
 #####################################
@@ -419,10 +511,11 @@ async def edit_user(message: types.Message):
         else:
             reply = Messages.WRONG_GENDER.escaped()
     elif field == "birthday":
-        if await is_date(message.text):
-            value = message.text
+        try:
+            date = datetime.strptime(message.text, "%d.%m.%Y").date()
+            value = date
             unregister_handler = True
-        else:
+        except ValueError:
             reply = Messages.WRONG_BIRTHDAY.escaped()
     elif field == "email":
         if validators.email(message.text) is True:
@@ -513,11 +606,12 @@ async def register(message: types.Message):
         else:
             user["email"] = message.text
     elif "gender" in user:
-        if await is_date(message.text):
-            user["birthday"] = message.text
+        try:
+            date = datetime.strptime(message.text, "%d.%m.%Y").date()
+            user["birthday"] = date
             reply = Messages.REG_EMAIL.escaped()
             reply_markup = await keyboard(Buttons.MN_REG.value)
-        else:
+        except ValueError:
             reply = Messages.WRONG_BIRTHDAY.escaped()
             reply_markup = await keyboard([Buttons.BTN_CANCEL.value])
 
@@ -565,14 +659,6 @@ async def is_phone_number(phone: str):
     pattern = r"^\+7\d{10}$"
     res = match(pattern, phone)
     return res is not None
-
-
-async def is_date(date: str):
-    try:
-        datetime.strptime(date, "%d.%m.%Y")
-        return True
-    except ValueError:
-        return False
 
 
 async def keyboard(buttons: list | dict):

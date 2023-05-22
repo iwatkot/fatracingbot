@@ -2,6 +2,7 @@ import os
 import sys
 import logging
 from datetime import datetime
+from collections import defaultdict
 from dotenv import load_dotenv
 
 CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -9,7 +10,11 @@ WORKSPACE_PATH = os.path.dirname(CURRENT_PATH)
 
 LOG_FORMATTER = "%(name)s | %(asctime)s | %(levelname)s | %(message)s"
 LOG_DIR = os.path.join(WORKSPACE_PATH, "logs")
+TMP_DIR = os.path.join(WORKSPACE_PATH, "tmp")
 os.makedirs(LOG_DIR, exist_ok=True)
+os.makedirs(TMP_DIR, exist_ok=True)
+
+DEBUG_CHAT_ID = "-907878930"
 
 
 class Logger(logging.getLoggerClass()):
@@ -36,6 +41,9 @@ class Logger(logging.getLoggerClass()):
 
 DEV_ENV_FILE = os.path.join(WORKSPACE_PATH, "dev.env")
 PROD_ENV_FILE = os.path.join(WORKSPACE_PATH, "prod.env")
+
+# MAP_TICKRATE = "*/5 * * * *"
+MAP_TICKRATE = "*/1 * * * *"
 
 
 def is_dev_mode():
@@ -74,6 +82,8 @@ class State:
 
         self.user_data = {}
         self.user_edit_field = None
+
+        self.location_data = defaultdict(list)
 
 
 logger = Logger(__name__)

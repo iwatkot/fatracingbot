@@ -7,6 +7,10 @@ from mongoengine import (
     IntField,
     ListField,
     FloatField,
+    DateField,
+    DateTimeField,
+    ReferenceField,
+    BooleanField,
 )
 
 import globals as g
@@ -33,7 +37,7 @@ class User(Document):
     last_name = StringField(required=True)
 
     gender = StringField(required=True)
-    birthday = StringField(required=True)
+    birthday = DateField(required=True)
 
     email = StringField()
     phone = StringField()
@@ -41,14 +45,17 @@ class User(Document):
 
 class Race(Document):
     name = StringField(required=True)
-    date = StringField(required=True)
-    time = StringField(required=True)
+    datetime = DateTimeField(required=True)
+
+    ended = BooleanField(default=False)
 
     categories = ListField(StringField(required=True))
 
     distance = FloatField(required=True)
 
     price = IntField(required=True)
+
+    participants = ListField(ReferenceField(User))
 
 
 async def get_user(telegram_id):
@@ -95,26 +102,78 @@ async def new_user(**kwargs):
 
 async def get_race_by_date(date: datetime.date = None):
     if not date:
-        date = datetime.today().strftime("%d.%m.%Y")
-    logger.debug(f"Trying to find event for date: {date}.")
+        date = datetime.today().date()
+        logger.debug(f"Date wasn't specified. Using today's date: {date}.")
 
-    race = Race.objects(date=date).first()
+    ################################
+    ##### ? PARTIALLY TESTED! ######
+    ################################
+
+    start = datetime.combine(date, datetime.min.time())
+    end = datetime.combine(date, datetime.max.time())
+
+    race = Race.objects(datetime__gte=start, datetime__lte=end).first()
 
     if race:
-        logger.debug(f"Found a {race.name} event for date: {date}.")
+        logger.debug(f"Found race {race.name} between {start} and {end}. Date: {date}.")
     else:
-        logger.debug(f"Didn't find any event for date: {date}.")
+        logger.debug(f"Can't find races between {start} and {end}. Date: {date}.")
+    return race
+
+
+async def get_future_race_by_name(name: str):
+    logger.debug(f"Trying to find upcoming race with name {name}.")
+
+    ################################
+    #### ! WARNING! NOT TESTED! ####
+    ################################
+
+    race = Race.objects(name=name, datetime__gte=datetime.today()).first()
+
+    if race:
+        logger.debug(f"Race with name {name} is found.")
+    else:
+        logger.debug(f"Can't find upcoming race with name {name}.")
 
     return race
 
 
+async def register_to_race(telegram_id, race_name):
+    logger.debug(
+        f"Trying to register user with telegram id {telegram_id} for race with name {race_name}."
+    )
+
+    ################################
+    #### ! WARNING! NOT TESTED! ####
+    ################################
+
+    user = get_user(telegram_id)
+    race = get_future_race_by_name(race_name)
+
+    if user and race:
+        race.participants.append(user)
+        race.save()
+
+        logger.debug(
+            f"Successfully registered user with telegram id {telegram_id} for race with name {race_name}."
+        )
+
+        res = True
+    else:
+        logger.warning(
+            f"Can't find either user with telegram id {telegram_id} or race with name {race_name}."
+        )
+        res = False
+    return res
+
+
 categories = ["М: CX / Gravel", "M: Road", "Ж: CX / Gravel", "Ж: Road"]
+datetime = datetime.strptime("22.05.2023 20:00", "%d.%m.%Y %H:%M")
 
 
 new_race = {
     "name": "Тестовая гонка",
-    "date": "22.05.2023",
-    "time": "14:00",
+    "datetime": datetime,
     "categories": categories,
     "distance": 50.2,
     "price": 1000,
