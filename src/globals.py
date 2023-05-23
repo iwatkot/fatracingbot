@@ -15,6 +15,9 @@ os.makedirs(LOG_DIR, exist_ok=True)
 os.makedirs(TMP_DIR, exist_ok=True)
 
 DEBUG_CHAT_ID = "-907878930"
+TEAM_CHAT_ID = "-937192524"
+
+HOUR_SHIFT = datetime.utcnow().hour - datetime.now().hour + 3
 
 
 class Logger(logging.getLoggerClass()):
@@ -42,8 +45,7 @@ class Logger(logging.getLoggerClass()):
 DEV_ENV_FILE = os.path.join(WORKSPACE_PATH, "dev.env")
 PROD_ENV_FILE = os.path.join(WORKSPACE_PATH, "prod.env")
 
-# MAP_TICKRATE = "*/5 * * * *"
-MAP_TICKRATE = "*/1 * * * *"
+MAP_TICKRATE = "*/5 * * * *"
 
 
 def is_dev_mode():
@@ -88,3 +90,7 @@ class State:
 
 logger = Logger(__name__)
 AppState = State()
+
+SBP_PHONE = os.getenv("SBP_PHONE")
+SBP_BANKS = os.getenv("SBP_BANKS")
+SBP_CRED = os.getenv("SBP_CRED")

@@ -1,5 +1,6 @@
 import io
 import os
+import secrets
 
 from enum import Enum
 from re import escape, match
@@ -62,6 +63,12 @@ class Messages(Enum):
 
     NO_RACE = "Сегодня не проводится ни одной гонки."
 
+    ONLY_FOR_REGISTERED = "Эта функция доступна только зарегистрированным участникам."
+    ONLY_FOR_PARTICIPANTS = (
+        "Эта функция доступна только участникам гонки. "
+        "Вы не найдены в списке участников."
+    )
+
     TRANSLATION_REQUEST = (
         "\n\nМы  `убедительно просим`  всех участников  `включить трансляцию геолокации`  на время гонки. "
         "Благодаря этому зрители смогут следить за положением гонщиков на "
@@ -85,6 +92,32 @@ class Messages(Enum):
         "Пожалуйста, включите трансляцию геолокации, иначе бот не сможет получать ваши данные."
     )
 
+    NO_EVENTS = "В ближайшее время не запланировано ни одной гонки."
+    RACE_INFO = (
+        "`{name}`\n\nСтарт:  `{start}`\nДистанция:  `{distance} км`\n"
+        "Категории:  {categories}"
+    )
+
+    PAYMENT_INSTRUCTIONS = (
+        "Вы добавлены в список участников гонки.\n"
+        "Пожалуйста,  `оплатите участие`  в гонке, в противном случае мы не гарантируем наличие доступного слота.\n\n"
+        "Сумма к оплате:  `{price}`\nНомер телефона для СБП:  `{phone}`\n"
+        "Список банков:  `{banks}`\nПолучатель:  `{cred}`\n\n"
+        "Вы получите сообщение от бота, когда платеж будет подтвержден. "
+        "Обратите внимание, что платежи обрабатываются в ручном режиме, подтверждение может занять некоторое время."
+    )
+
+    HELP_WITH_COORDS = (
+        "Бот уже знает ваше местоположение, пожалуйста кратко сообщите что у вас случилось. "
+        "Ваше сообщение с координатами будет отправлено организаторам и мы постараемся помочь вам как можно скорее."
+    )
+
+    HELP_NO_COORDS = ""  # TODO: Add text.
+
+    SOS_MESSAGE = (
+        "🚨 Поступил запрос помощи.\n\nTelegram username: {telegram_username}\n"
+    )
+
     def format(self, *args, **kwargs):
         return escape(self.value.format(*args, **kwargs))
 
@@ -93,10 +126,15 @@ class Messages(Enum):
 
 
 class Buttons(Enum):
+    # * Context buttons.
     BTN_CANCEL = "Отмена"
     BTN_SKIP = "Пропустить"
     BTN_CONFIRM = "Подтвердить"
+    BTN_GENDER_M = "Мужской"
+    BTN_GENDER_F = "Женский"
+    GENDERS = [BTN_GENDER_M, BTN_GENDER_F]
 
+    # * Main menu buttons.
     BTN_ACCOUNT = "Личный кабинет"
     BTN_DURING_RACE = "Во время гонки"
     BTN_EVENTS = "Мероприятия"
@@ -104,19 +142,21 @@ class Buttons(Enum):
     BTN_MAIN = "Главное меню"
     BTN_ADMIN = "Администрирование"
 
+    # * Account menu buttons.
     BTN_ACCOUNT_NEW = "Регистрация"
     BTN_ACCOUNT_INFO = "Мои данные"
     BTN_ACCOUNT_EDIT = "Редактировать"
 
-    BTN_GENDER_M = "Мужской"
-    BTN_GENDER_F = "Женский"
-    GENDERS = [BTN_GENDER_M, BTN_GENDER_F]
-
+    # * During race menu buttons.
     BTN_TRANSLATION = "Трансляция геолокации"
     BTN_LEADERBOARD = "Таблица лидеров"
     BTN_YOUR_STATUS = "Ваши показатели"
     BTN_NEED_HELP = "Мне нужна помощь"
 
+    # * Events menu buttons.
+    UPCOMING_EVENTS = "Предстоящие гонки"
+
+    # * Main menus.
     MN_MAIN_USER = [BTN_ACCOUNT, BTN_DURING_RACE, BTN_EVENTS, BTN_INFO, BTN_ADMIN]
     MN_MAIN_ADMIN = [
         BTN_ACCOUNT,
@@ -127,9 +167,14 @@ class Buttons(Enum):
         BTN_ADMIN,
     ]
 
+    # * Account menus.
     MN_ACCOUNT_NEW = [BTN_ACCOUNT_NEW, BTN_MAIN]
     MN_ACCOUNT_EXIST = [BTN_ACCOUNT_INFO, BTN_ACCOUNT_EDIT, BTN_MAIN]
+    MN_REG = [BTN_CANCEL, BTN_SKIP]
+    MN_REG_GENDER = [BTN_GENDER_M, BTN_GENDER_F, BTN_CANCEL]
+    MN_REG_CONFIRM = [BTN_CONFIRM, BTN_CANCEL]
 
+    # * During race menu.
     MN_DURING_RACE = [
         BTN_TRANSLATION,
         BTN_LEADERBOARD,
@@ -138,9 +183,8 @@ class Buttons(Enum):
         BTN_MAIN,
     ]
 
-    MN_REG = [BTN_CANCEL, BTN_SKIP]
-    MN_REG_GENDER = [BTN_GENDER_M, BTN_GENDER_F, BTN_CANCEL]
-    MN_REG_CONFIRM = [BTN_CONFIRM, BTN_CANCEL]
+    # * Events menu.
+    MN_EVENTS = [UPCOMING_EVENTS, BTN_MAIN]
 
 
 #####################################
@@ -206,6 +250,20 @@ async def button_during_race(message: types.Message()):
     await log_event(message)
 
     reply_markup = await keyboard(Buttons.MN_DURING_RACE.value)
+
+    await bot.send_message(
+        message.from_user.id,
+        Messages.MENU_CHANGED.format(message.text),
+        reply_markup=reply_markup,
+        parse_mode="MarkdownV2",
+    )
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_EVENTS.value))
+async def button_events(message: types.Message):
+    await log_event(message)
+
+    reply_markup = await keyboard(Buttons.MN_EVENTS.value)
 
     await bot.send_message(
         message.from_user.id,
@@ -310,23 +368,81 @@ async def button_translation(message: types.Message):
         await bot.send_message(message.from_user.id, Messages.NO_RACE.value)
         return
 
-    race = race.to_mongo()
-
     reply = escape(
-        f"Сегодня проводится гонка  `{race['name']}`\n\n"
-        f"Старт:  `{race['datetime']}` \nДистанция:  `{race['distance']} км`"
+        f"Сегодня проводится гонка  `{race.name}`\n\n"
+        f"Старт:  `{datetime.strftime(race.start, '%H:%M')}` \nДистанция:  `{race.distance} км`"
     )
 
     #####################################
-    #### ! TODO: add check if user ######
-    #### ! registered for the event #####
-    # ? if not await db.is_registered_for_event(telegram_id, race_name):
-    # ?     await bot.send_message(...
-    # ?     return
+    #### ! UNCOMMENT AFTER TDS RACE #####
+    #####################################
+    # user = await db.get_user(message.from_user.id)
+    # if not user:
+    #    await bot.send_message(message.from_user.id, Messages.ONLY_FOR_REGISTERED.value)
+    #    return
+    #
+    # if user not in race.participants:
+    #    await bot.send_message(
+    #        message.from_user.id, Messages.ONLY_FOR_PARTICIPANTS.value
+    #    )
+    #    return
+    #####################################
+    ### ! ENDBLOCK UNCOMMENT AFTER TDS ##
     #####################################
 
     reply += Messages.TRANSLATION_REQUEST.escaped()
     reply_markup = await keyboard({"location_translation": "Трансляция геолокации"})
+
+    await bot.send_message(
+        message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
+    )
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_NEED_HELP.value))
+async def button_need_help(message: types.Message):
+    await log_event(message)
+
+    coords = g.AppState.location_data.get(message.from_user.id)
+
+    if not coords:
+        # TODO: ask for location with registered next handler
+        return
+
+    await bot.send_message(
+        message.from_user.id,
+        Messages.HELP_WITH_COORDS.value,
+    )
+
+    dp.register_message_handler(send_sos_message)
+
+
+#####################################
+##### * Events buttons handlers #####
+#####################################
+
+
+@dp.message_handler(Text(equals=Buttons.UPCOMING_EVENTS.value))
+async def button_upcoming_events(message: types.Message):
+    await log_event(message)
+
+    events = await db.get_upcoming_races()
+
+    if not events:
+        await bot.send_message(message.from_user.id, Messages.NO_EVENTS.value)
+        return
+
+    reply = escape("Ближайшие гонки:\n\n")
+
+    events_data = {}
+
+    for event in events:
+        event = event.to_mongo()
+        date = event["start"].strftime("%d.%m.%Y")
+        text = f"{date} - {event['name']}"
+        callback_data = f"race_info_{event['name']}"
+        events_data[callback_data] = text
+
+    reply_markup = await keyboard(events_data)
 
     await bot.send_message(
         message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
@@ -390,11 +506,15 @@ LON = 31.765989
 async def map_update():
     logger.debug("Crontab rule started...")
 
+    #####################################
+    #### ? How to clear global state? ###
+    #####################################
+
     if not g.AppState.location_data:
         return
 
     #####################################
-    ### ? MOSTLY FOR DEBUGGING PURPOSE ##
+    ### ! MOSTLY FOR DEBUGGING PURPOSE ##
     #####################################
 
     m = folium.Map(location=[LAT, LON], zoom_start=13)
@@ -471,6 +591,101 @@ async def callback_location_translation(callback_query: types.CallbackQuery):
         Messages.TRANSLATION_TOOLTIP.escaped(),
         parse_mode="MarkdownV2",
     )
+
+
+@dp.callback_query_handler(text_contains="race_info_")
+async def callback_race_info(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    race_name = callback_query.data.rsplit("_", 1)[-1]
+    race = await db.get_upcoming_race_by_name(race_name)
+
+    race_json = race.to_mongo()
+
+    race_json["start"] = race_json["start"].strftime("%d.%m.%Y %H:%M")
+    race_json["categories"] = ", ".join(race_json["categories"])
+
+    reply = Messages.RACE_INFO.format(**race_json)
+
+    user = await db.get_user(callback_query.from_user.id)
+
+    if user in race.participants:
+        payment = await db.get_payment(callback_query.message.from_user.id, race)
+
+        if not payment:
+            text = " | оплата не подтверждена"
+        elif not payment.verified:
+            text = " | оплата не подтверждена"
+        else:
+            text = " | оплата подтверждена"
+
+        button = {secrets.token_hex(10): "Вы зарегестрированы" + text}
+    elif race.registration_open:
+        button = {
+            f"race_choose_category_{race_name}": f"Регистрация на гонку ({race.price}₽)"
+        }
+    else:
+        button = {secrets.token_hex(10): "Регистрация закрыта"}
+
+    reply_markup = await keyboard(button)
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        reply,
+        parse_mode="MarkdownV2",
+        reply_markup=reply_markup,
+    )
+
+
+@dp.callback_query_handler(text_contains="race_choose_category_")
+async def callback_race_choose_category(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    race_name = callback_query.data.rsplit("_", 1)[-1]
+    race = await db.get_upcoming_race_by_name(race_name)
+
+    user = await db.get_user(callback_query.from_user.id)
+
+    if not (race and user):
+        return
+
+    gender_code = user.gender[0].lower()
+    categories = [ct for ct in race.categories if ct.lower().startswith(gender_code)]
+    buttons = {f"race_register_{race_name};{ct}": ct for ct in categories}
+
+    reply_markup = await keyboard(buttons)
+    reply = "Пожалуйста, выберите вашу категорию:"
+
+    await bot.send_message(
+        callback_query.from_user.id, reply, reply_markup=reply_markup
+    )
+
+
+@dp.callback_query_handler(text_contains="race_register_")
+async def callback_race_register(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    race_and_category_names = callback_query.data.rsplit("_", 1)[-1]
+    race_name, category = race_and_category_names.split(";")
+
+    race = await db.get_upcoming_race_by_name(race_name)
+
+    if await db.register_to_race(callback_query.from_user.id, race_name, category):
+        reply = Messages.PAYMENT_INSTRUCTIONS.format(
+            price=race.price,
+            phone=g.SBP_PHONE,
+            banks=g.SBP_BANKS,
+            cred=g.SBP_CRED,
+        )
+
+        await bot.send_message(
+            callback_query.from_user.id,
+            reply,
+            parse_mode="MarkdownV2",
+        )
+
+    else:
+        await bot.send_message(callback_query.from_user.id, "Что-то пошло не так...")
 
 
 #####################################
@@ -635,6 +850,32 @@ async def register(message: types.Message):
     await bot.send_message(
         message.from_user.id, reply, reply_markup=reply_markup, parse_mode="MarkdownV2"
     )
+
+
+async def send_sos_message(message: types.Message):
+    telegram_username = message.from_user.username
+    telegram_username = (
+        f"@{telegram_username}" if telegram_username else "скрыт или не указан"
+    )
+    sos = Messages.SOS_MESSAGE.format(telegram_username=telegram_username)
+
+    dp.message_handlers.unregister(send_sos_message)
+
+    user = await db.get_user(message.from_user.id)
+
+    if user:
+        sos += (
+            f"Имя:  `{user.first_name}`\nФамилия:  `{user.last_name}`\n"
+            f"Телефон:  `{user.phone}`\n"
+        )
+
+    sos += f"\nСообщение: {message.text}"
+
+    await bot.send_message(g.TEAM_CHAT_ID, sos, parse_mode="MarkdownV2")
+
+    latitude, longitude = g.AppState.location_data.get(message.from_user.id)
+
+    await bot.send_location(g.TEAM_CHAT_ID, latitude, longitude)
 
 
 #####################################

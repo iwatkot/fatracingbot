@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from collections import namedtuple
 
 from mongoengine import (
     connect,
@@ -11,6 +12,7 @@ from mongoengine import (
     DateTimeField,
     ReferenceField,
     BooleanField,
+    DictField,
 )
 
 import globals as g
@@ -45,9 +47,7 @@ class User(Document):
 
 class Race(Document):
     name = StringField(required=True)
-    datetime = DateTimeField(required=True)
-
-    ended = BooleanField(default=False)
+    start = DateTimeField(required=True)
 
     categories = ListField(StringField(required=True))
 
@@ -55,7 +55,47 @@ class Race(Document):
 
     price = IntField(required=True)
 
+    registration_open = BooleanField(default=True)
+
     participants = ListField(ReferenceField(User))
+    participant_info = ListField(
+        DictField(
+            fields={
+                "telegram_id": IntField(required=True),
+                "category": StringField(required=True),
+                "race_number": StringField(required=False),
+            },
+        )
+    )
+
+    ended = BooleanField(default=False)
+
+
+class Payment(Document):
+    telegram_id = IntField(required=True)
+    race = ReferenceField(Race, required=True)
+    price = IntField(required=True)
+    date = DateTimeField(required=True)
+
+    verified = BooleanField(default=False)
+
+
+async def get_payment(telegram_id, race):
+    payment = Payment.objects(telegram_id=telegram_id, race=race).first()
+    return payment
+
+
+async def new_payment(telegram_id, race, price):
+    date = get_day().now
+
+    payment = {
+        "telegram_id": telegram_id,
+        "race": race,
+        "price": price,
+        "date": date,
+    }
+
+    Payment(**payment).save()
 
 
 async def get_user(telegram_id):
@@ -100,35 +140,39 @@ async def new_user(**kwargs):
     return User(**kwargs).save()
 
 
-async def get_race_by_date(date: datetime.date = None):
-    if not date:
-        date = datetime.today().date()
-        logger.debug(f"Date wasn't specified. Using today's date: {date}.")
+async def get_upcoming_races():
+    day = get_day()
 
-    ################################
-    ##### ? PARTIALLY TESTED! ######
-    ################################
+    logger.debug(f"Trying to get list of upcoming races after {day.now}.")
 
-    start = datetime.combine(date, datetime.min.time())
-    end = datetime.combine(date, datetime.max.time())
+    races = Race.objects(start__gte=day.now).order_by("start")
 
-    race = Race.objects(datetime__gte=start, datetime__lte=end).first()
+    logger.debug(f"Found {len(races)} races after {day.now}.")
+
+    return races
+
+
+async def get_race_by_date(day: str = None):
+    if not day:
+        day = get_day()
+    else:
+        day = get_day(day)
+
+    race = Race.objects(start__gte=day.begin, start__lte=day.end).first()
 
     if race:
-        logger.debug(f"Found race {race.name} between {start} and {end}. Date: {date}.")
+        logger.debug(f"Found race {race.name} between {day.begin} and {day.end}.")
     else:
-        logger.debug(f"Can't find races between {start} and {end}. Date: {date}.")
+        logger.debug(f"Can't find races between {day.begin} and {day.end}.")
     return race
 
 
-async def get_future_race_by_name(name: str):
+async def get_upcoming_race_by_name(name: str):
     logger.debug(f"Trying to find upcoming race with name {name}.")
 
-    ################################
-    #### ! WARNING! NOT TESTED! ####
-    ################################
+    day = get_day()
 
-    race = Race.objects(name=name, datetime__gte=datetime.today()).first()
+    race = Race.objects(name=name, start__gte=day.now).first()
 
     if race:
         logger.debug(f"Race with name {name} is found.")
@@ -138,25 +182,35 @@ async def get_future_race_by_name(name: str):
     return race
 
 
-async def register_to_race(telegram_id, race_name):
+async def register_to_race(telegram_id, race_name, category):
     logger.debug(
-        f"Trying to register user with telegram id {telegram_id} for race with name {race_name}."
+        f"Trying to register user with telegram id {telegram_id} for race with name {race_name} "
+        f"and category {category}."
     )
 
-    ################################
-    #### ! WARNING! NOT TESTED! ####
-    ################################
+    user = await get_user(telegram_id)
 
-    user = get_user(telegram_id)
-    race = get_future_race_by_name(race_name)
+    participant_info = {
+        "telegram_id": telegram_id,
+        "category": category,
+        "race_number": "N/A",
+    }
+
+    logger.debug(f"Prepared participant info: {participant_info}.")
+
+    race = await get_upcoming_race_by_name(race_name)
 
     if user and race:
         race.participants.append(user)
+        race.participant_info.append(participant_info)
         race.save()
 
         logger.debug(
-            f"Successfully registered user with telegram id {telegram_id} for race with name {race_name}."
+            f"Successfully registered user with telegram id {telegram_id} for race with name {race_name}. "
+            f"in category {category}."
         )
+
+        await new_payment(telegram_id, race, race.price)
 
         res = True
     else:
@@ -167,13 +221,31 @@ async def register_to_race(telegram_id, race_name):
     return res
 
 
-categories = ["М: CX / Gravel", "M: Road", "Ж: CX / Gravel", "Ж: Road"]
-datetime = datetime.strptime("22.05.2023 20:00", "%d.%m.%Y %H:%M")
+def get_day(dt: str = None):
+    Day = namedtuple("Day", ["begin", "now", "end"])
+
+    if not dt:
+        dt = datetime.now() + timedelta(hours=g.HOUR_SHIFT)
+    else:
+        dt = datetime.strptime(f"{dt} 00:00", "%d.%m.%Y %H:%M")
+
+    dts = datetime.combine(dt, datetime.min.time())
+    dte = datetime.combine(dt, datetime.max.time())
+
+    day = Day(dts, dt, dte)
+
+    return day
+
+
+categories = ["М: CX / Gravel", "М: Road", "Ж: CX / Gravel", "Ж: Road"]
+start = datetime.strptime("23.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
+    hours=g.HOUR_SHIFT
+)
 
 
 new_race = {
     "name": "Тестовая гонка",
-    "datetime": datetime,
+    "start": start,
     "categories": categories,
     "distance": 50.2,
     "price": 1000,
