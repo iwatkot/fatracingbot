@@ -1,9 +1,9 @@
 __pycache__/
 .git/
 .venv/
-gpx/
 logs/
 .gitignore
+.flake8
 LICENSE.md
 README.md
 dev.env
