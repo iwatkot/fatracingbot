@@ -118,6 +118,12 @@ class Messages(Enum):
         "🚨 Поступил запрос помощи.\n\nTelegram username: {telegram_username}\n"
     )
 
+    ADMIN_RACE_STARTED = (
+        "🏁 Информация о гонке сохранена, статус гонки успешно изменен на активный."
+    )
+    ADMIN_NO_ACTIVE_RACE = "🚫 Нет активных гонок."
+    ADMIN_RACE_END = "✅ Статус гонки успешно изменен на завершенный, трансляция геолокации остановлена."
+
     def format(self, *args, **kwargs):
         return escape(self.value.format(*args, **kwargs))
 
@@ -128,6 +134,7 @@ class Messages(Enum):
 class Buttons(Enum):
     # * Context buttons.
     BTN_CANCEL = "Отмена"
+    BTN_COMPLETE = "Завершить"  # TODO: This button is for race results on finish.
     BTN_SKIP = "Пропустить"
     BTN_CONFIRM = "Подтвердить"
     BTN_GENDER_M = "Мужской"
@@ -145,6 +152,7 @@ class Buttons(Enum):
     # * Account menu buttons.
     BTN_ACCOUNT_NEW = "Регистрация"
     BTN_ACCOUNT_INFO = "Мои данные"
+    BTN_ACCOUNT_RESULTS = "Мои результаты"
     BTN_ACCOUNT_EDIT = "Редактировать"
 
     # * During race menu buttons.
@@ -156,6 +164,11 @@ class Buttons(Enum):
     # * Events menu buttons.
     UPCOMING_EVENTS = "Предстоящие гонки"
 
+    # * Admin menu buttons.
+    BTN_MANAGE_RACE = "Управление гонкой"
+    BTN_MANAGE_PAYMENTS = "Управление платежами"
+    BTN_MANAGE_EVENTS = "Управление мероприятиями"
+
     # * Main menus.
     MN_MAIN_USER = [BTN_ACCOUNT, BTN_DURING_RACE, BTN_EVENTS, BTN_INFO, BTN_ADMIN]
     MN_MAIN_ADMIN = [
@@ -164,12 +177,16 @@ class Buttons(Enum):
         BTN_EVENTS,
         BTN_INFO,
         BTN_ADMIN,
-        BTN_ADMIN,
     ]
 
     # * Account menus.
     MN_ACCOUNT_NEW = [BTN_ACCOUNT_NEW, BTN_MAIN]
-    MN_ACCOUNT_EXIST = [BTN_ACCOUNT_INFO, BTN_ACCOUNT_EDIT, BTN_MAIN]
+    MN_ACCOUNT_EXIST = [
+        BTN_ACCOUNT_INFO,
+        BTN_ACCOUNT_RESULTS,
+        BTN_ACCOUNT_EDIT,
+        BTN_MAIN,
+    ]
     MN_REG = [BTN_CANCEL, BTN_SKIP]
     MN_REG_GENDER = [BTN_GENDER_M, BTN_GENDER_F, BTN_CANCEL]
     MN_REG_CONFIRM = [BTN_CONFIRM, BTN_CANCEL]
@@ -185,6 +202,12 @@ class Buttons(Enum):
 
     # * Events menu.
     MN_EVENTS = [UPCOMING_EVENTS, BTN_MAIN]
+
+    # * Admin menu.
+    MN_ADMIN = [BTN_MANAGE_RACE, BTN_MANAGE_PAYMENTS, BTN_MANAGE_EVENTS, BTN_MAIN]
+
+    # ? Not implemented list of buttons.
+    NOT_IMPLEMENTED = [BTN_ACCOUNT_RESULTS, BTN_LEADERBOARD, BTN_YOUR_STATUS, BTN_INFO]
 
 
 #####################################
@@ -264,6 +287,23 @@ async def button_events(message: types.Message):
     await log_event(message)
 
     reply_markup = await keyboard(Buttons.MN_EVENTS.value)
+
+    await bot.send_message(
+        message.from_user.id,
+        Messages.MENU_CHANGED.format(message.text),
+        reply_markup=reply_markup,
+        parse_mode="MarkdownV2",
+    )
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_ADMIN.value))
+async def button_admin(message: types.Message):
+    await log_event(message)
+
+    if not await is_admin(message):
+        return
+
+    reply_markup = await keyboard(Buttons.MN_ADMIN.value)
 
     await bot.send_message(
         message.from_user.id,
@@ -373,14 +413,14 @@ async def button_translation(message: types.Message):
         f"Старт:  `{datetime.strftime(race.start, '%H:%M')}` \nДистанция:  `{race.distance} км`"
     )
 
+    user = await db.get_user(message.from_user.id)
+    if not user:
+        await bot.send_message(message.from_user.id, Messages.ONLY_FOR_REGISTERED.value)
+        return
+
     #####################################
     #### ! UNCOMMENT AFTER TDS RACE #####
     #####################################
-    # user = await db.get_user(message.from_user.id)
-    # if not user:
-    #    await bot.send_message(message.from_user.id, Messages.ONLY_FOR_REGISTERED.value)
-    #    return
-    #
     # if user not in race.participants:
     #    await bot.send_message(
     #        message.from_user.id, Messages.ONLY_FOR_PARTICIPANTS.value
@@ -436,13 +476,52 @@ async def button_upcoming_events(message: types.Message):
     events_data = {}
 
     for event in events:
-        event = event.to_mongo()
-        date = event["start"].strftime("%d.%m.%Y")
-        text = f"{date} - {event['name']}"
-        callback_data = f"race_info_{event['name']}"
+        date = event.start.strftime("%d.%m.%Y")
+        text = f"{date} - {event.name}"
+        callback_data = f"race_info_{event.name}"
         events_data[callback_data] = text
 
     reply_markup = await keyboard(events_data)
+
+    await bot.send_message(
+        message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
+    )
+
+
+#####################################
+######### * Admin handlers ##########
+#####################################
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_MANAGE_RACE.value))
+async def button_manage_race(message: types.Message):
+    await log_event(message)
+
+    if not await is_admin(message):
+        return
+
+    race = await db.get_race_by_date()
+    if not race:
+        await bot.send_message(
+            message.from_user.id,
+            Messages.NO_RACE.value,
+        )
+        return
+
+    reply = Messages.RACE_INFO.format(
+        name=race.name,
+        start=race.start.strftime("%d.%m.%Y %H:%M"),
+        distance=race.distance,
+        categories=", ".join(race.categories),
+    )
+
+    buttons = {
+        f"race_start_init_{race.name}": "Гонка началась",
+        f"race_timekeeping_init_{race.name}": "Фиксация результатов",
+        f"race_end_init_{race.name}": "Гонка завершена",
+    }
+
+    reply_markup = await keyboard(buttons)
 
     await bot.send_message(
         message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
@@ -498,43 +577,45 @@ async def translation(message: types.Message):
 ######## * Crontab handlers #########
 #####################################
 
-LAT = 36.6277
-LON = 31.765989
-
 
 @crontab(g.MAP_TICKRATE)
-async def map_update():
-    logger.debug("Crontab rule started...")
+async def race_map_create():
+    logger.debug("Crontab rule for race map creation triggered.")
 
-    #####################################
-    #### ? How to clear global state? ###
-    #####################################
-
-    if not g.AppState.location_data:
+    if not (g.AppState.Race.info and g.AppState.Race.ongoing):
+        logger.debug("There's no active race at the moment.")
         return
 
-    #####################################
-    ### ! MOSTLY FOR DEBUGGING PURPOSE ##
-    #####################################
+    if not g.AppState.location_data:
+        logger.debug("Race is active, but no location data received yet.")
+        return
 
-    m = folium.Map(location=[LAT, LON], zoom_start=13)
+    location = g.AppState.Race.info.location
+
+    m = folium.Map(location=location, zoom_start=13)
     for telegram_id, coords in g.AppState.location_data.items():
         folium.Marker(coords, popup=telegram_id).add_to(m)
 
     logger.debug(f"Map created, added {len(g.AppState.location_data)} markers.")
 
-    img_data = m._to_png(5)
-    img = Image.open(io.BytesIO(img_data))
+    #####################################
+    ###### * DEBUG SAVING TO IMAGE ######
+    ###### ! DELETE IN PRODUCTION #######
+    #### ! BECAUSE ITS SLOW AS HELL #####
+    #####################################
 
-    img_path = os.path.join(g.TMP_DIR, "map.png")
+    # img_data = m._to_png(5)
+    # img = Image.open(io.BytesIO(img_data))
 
-    img.save(img_path)
+    # img_path = os.path.join(g.TMP_DIR, "map.png")
 
-    logger.debug(f"Map image saved to {img_path}, trying to send...")
+    # img.save(img_path)
 
-    photo = InputFile(img_path)
+    # logger.debug(f"Map image saved to {img_path}, trying to send...")
 
-    await bot.send_photo(g.DEBUG_CHAT_ID, photo)
+    # photo = InputFile(img_path)
+
+    # await bot.send_photo(g.DEBUG_CHAT_ID, photo)
 
 
 #####################################
@@ -600,12 +681,12 @@ async def callback_race_info(callback_query: types.CallbackQuery):
     race_name = callback_query.data.rsplit("_", 1)[-1]
     race = await db.get_upcoming_race_by_name(race_name)
 
-    race_json = race.to_mongo()
-
-    race_json["start"] = race_json["start"].strftime("%d.%m.%Y %H:%M")
-    race_json["categories"] = ", ".join(race_json["categories"])
-
-    reply = Messages.RACE_INFO.format(**race_json)
+    reply = Messages.RACE_INFO.format(
+        name=race.name,
+        start=race.start.strftime("%d.%m.%Y %H:%M"),
+        distance=race.distance,
+        categories=", ".join(race.categories),
+    )
 
     user = await db.get_user(callback_query.from_user.id)
 
@@ -619,15 +700,17 @@ async def callback_race_info(callback_query: types.CallbackQuery):
         else:
             text = " | оплата подтверждена"
 
-        button = {secrets.token_hex(10): "Вы зарегестрированы" + text}
+        buttons = {secrets.token_hex(10): "Вы зарегестрированы" + text}
     elif race.registration_open:
-        button = {
+        buttons = {
             f"race_choose_category_{race_name}": f"Регистрация на гонку ({race.price}₽)"
         }
     else:
-        button = {secrets.token_hex(10): "Регистрация закрыта"}
+        buttons = {secrets.token_hex(10): "Регистрация закрыта"}
 
-    reply_markup = await keyboard(button)
+    buttons[f"race_location_{race_name}"] = "Место старта"
+
+    reply_markup = await keyboard(buttons)
 
     await bot.send_message(
         callback_query.from_user.id,
@@ -635,6 +718,18 @@ async def callback_race_info(callback_query: types.CallbackQuery):
         parse_mode="MarkdownV2",
         reply_markup=reply_markup,
     )
+
+
+@dp.callback_query_handler(text_contains="race_location_")
+async def callback_race_location(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    race_name = callback_query.data.rsplit("_", 1)[-1]
+    race = await db.get_upcoming_race_by_name(race_name)
+
+    latitude, longitude = race.location
+
+    await bot.send_location(callback_query.from_user.id, latitude, longitude)
 
 
 @dp.callback_query_handler(text_contains="race_choose_category_")
@@ -686,6 +781,59 @@ async def callback_race_register(callback_query: types.CallbackQuery):
 
     else:
         await bot.send_message(callback_query.from_user.id, "Что-то пошло не так...")
+
+
+@dp.callback_query_handler(text_contains="race_start_init_")
+async def callback_race_start_init(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    if not await is_admin(callback_query):
+        return
+
+    # ? Debug variable, needs only for checking if correct race is chosen.
+    # ! Remove in production.
+    race_name = callback_query.data.rsplit("_", 1)[-1]
+
+    race = await db.get_race_by_date()
+
+    # ? Debug check.
+    # ! Remove in production.
+    if race.name != race_name:
+        await bot.send_message(
+            callback_query.from_user.id,
+            "Data has not passed debug check, incorrect race is chosen.",
+        )
+        return
+
+    g.AppState.Race.info = race
+    g.AppState.Race.ongoing = True
+
+    await bot.send_message(
+        callback_query.from_user.id, Messages.ADMIN_RACE_STARTED.value
+    )
+
+
+@dp.callback_query_handler(text_contains="race_end_init_")
+async def callback_race_end_init(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    if not await is_admin(callback_query):
+        return
+
+    if not (g.AppState.Race.info and g.AppState.Race.ongoing):
+        await bot.send_message(
+            callback_query.from_user.id,
+            Messages.ADMIN_NO_ACTIVE_RACE.value,
+        )
+
+    else:
+        g.AppState.Race.ongoing = False
+        g.AppState.Race.info = None
+
+        await bot.send_message(
+            callback_query.from_user.id,
+            Messages.ADMIN_RACE_END.value,
+        )
 
 
 #####################################
@@ -933,6 +1081,16 @@ async def log_event(data: dict):
         logger.debug(
             f"Callback from {data.from_user.username} with telegram ID {data.from_user.id}: {data.data}"
         )
+
+
+#####################################
+##### ? Not implemented handler #####
+#####################################
+
+
+@dp.message_handler(Text(equals=Buttons.NOT_IMPLEMENTED.value))
+async def not_implemented(message: types.Message):
+    await bot.send_message(message.from_user.id, "Фунция еще не реализована.")
 
 
 if __name__ == "__main__":

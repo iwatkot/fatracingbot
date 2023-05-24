@@ -65,7 +65,7 @@ class State:
     class Bot:
         def __init__(self):
             self.token = os.getenv("TOKEN")
-            self.admins = os.getenv("ADMINS").split(",")
+            self.admins = [int(admin) for admin in os.getenv("ADMINS").split(",")]
 
     class DataBase:
         def __init__(self):
@@ -75,12 +75,19 @@ class State:
             self.password = os.getenv("PASSWORD")
             self.db = os.getenv("DB")
 
+    class Race:
+        def __init__(self):
+            self.info = None
+            self.ongoing = False
+
     def __init__(self):
         # Reads .env files and saved the app mode, must be run first.
         self.dev_mode = is_dev_mode()
 
         self.Bot = self.Bot()
+
         self.DataBase = self.DataBase()
+        self.Race = self.Race()
 
         self.user_data = {}
         self.user_edit_field = None

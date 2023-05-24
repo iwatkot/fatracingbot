@@ -48,6 +48,9 @@ class User(Document):
 class Race(Document):
     name = StringField(required=True)
     start = DateTimeField(required=True)
+    location = ListField(FloatField(required=True), required=True)
+
+    code = StringField(required=True)
 
     categories = ListField(StringField(required=True))
 
@@ -238,14 +241,20 @@ def get_day(dt: str = None):
 
 
 categories = ["М: CX / Gravel", "М: Road", "Ж: CX / Gravel", "Ж: Road"]
-start = datetime.strptime("23.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
+start = datetime.strptime("24.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
     hours=g.HOUR_SHIFT
 )
 
 
+TDS_COORDS = [58.649757, 31.459013]
+TDS_CODE = "TDS"
+
+
 new_race = {
-    "name": "Тестовая гонка",
+    "name": "Tour De Selishi 2023",
     "start": start,
+    "location": TDS_COORDS,
+    "code": TDS_CODE,
     "categories": categories,
     "distance": 50.2,
     "price": 1000,
