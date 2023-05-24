@@ -14,7 +14,8 @@ from aiogram.dispatcher.filters import Text
 from aiocron import crontab
 
 import folium
-import validators
+
+# import validators
 
 import globals as g
 import database as db
@@ -908,7 +909,7 @@ async def edit_user(message: types.Message):
         except ValueError:
             reply = Messages.WRONG_BIRTHDAY.escaped()
     elif field == "email":
-        if validators.email(message.text) is True:
+        if is_email(message.text) is True:
             unregister_handler = True
             value = message.text
         else:
@@ -991,7 +992,7 @@ async def register(message: types.Message):
 
         if message.text == Buttons.BTN_SKIP.value:
             user["email"] = None
-        elif validators.email(message.text) is not True:
+        elif is_email(message.text) is not True:
             reply = Messages.WRONG_EMAIL.escaped()
         else:
             user["email"] = message.text
@@ -1074,6 +1075,12 @@ async def get_user_json(telegram_id):
 async def is_phone_number(phone: str):
     pattern = r"^\+7\d{10}$"
     res = match(pattern, phone)
+    return res is not None
+
+
+def is_email(email: str):
+    pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
+    res = match(pattern, email)
     return res is not None
 
 
