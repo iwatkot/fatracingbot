@@ -1,8 +1,11 @@
 import secrets
+import os
 
 from enum import Enum
 from re import escape, match
 from datetime import datetime
+
+from multiprocessing import Process
 
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton  # InputFile
@@ -15,6 +18,8 @@ import validators
 
 import globals as g
 import database as db
+
+import webserver as ws
 
 logger = g.Logger(__name__)
 
@@ -601,16 +606,6 @@ async def translation(message: types.Message):
 ######## * Crontab handlers #########
 #####################################
 
-# ? Code for testing
-# LAT, LON = 36.62777015007213, 31.76627313050468
-# m = folium.Map(location=[LAT, LON], zoom_start=13)
-# folium.Marker(
-#    [LAT, LON],
-#    icon=folium.Icon(icon="glyphicon glyphicon-record", color="red"),
-#    popup="Test",
-# ).add_to(m)
-# m.save("map.html")
-
 
 @crontab(g.MAP_TICKRATE)
 async def race_map_create():
@@ -640,32 +635,14 @@ async def race_map_create():
             icon=folium.Icon(icon="glyphicon glyphicon-record", color="red"),
         ).add_to(m)
 
-    m.save("map.html")
+    race_code = g.AppState.Race.info.code
+    map_save_path = os.path.join(g.STATIC_DIR, f"{race_code}_map.html")
 
-    logger.debug(f"Map created, added {len(g.AppState.location_data)} markers.")
+    m.save(map_save_path)
 
-    #####################################
-    ###### * DEBUG SAVING TO IMAGE ######
-    ###### ! DELETE IN PRODUCTION #######
-    #### ! BECAUSE ITS SLOW AS HELL #####
-    #####################################
-
-    # import io
-    # import os
-    # from PIL import Image
-
-    # img_data = m._to_png(5)
-    # img = Image.open(io.BytesIO(img_data))
-
-    # img_path = os.path.join(g.TMP_DIR, "map.png")
-
-    # img.save(img_path)
-
-    # logger.debug(f"Map image saved to {img_path}, trying to send...")
-
-    # photo = InputFile(img_path)
-
-    # await bot.send_photo(g.DEBUG_CHAT_ID, photo)
+    logger.debug(
+        f"Map created, added {len(g.AppState.location_data)} markers. Saved to {map_save_path}."
+    )
 
 
 #####################################
@@ -1144,4 +1121,6 @@ async def not_implemented(message: types.Message):
 
 
 if __name__ == "__main__":
+    ws_process = Process(target=ws.launch)
+    ws_process.start()
     executor.start_polling(dp)

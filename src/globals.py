@@ -2,7 +2,6 @@ import os
 import sys
 import logging
 from datetime import datetime
-from collections import defaultdict
 from dotenv import load_dotenv
 
 CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -10,14 +9,25 @@ WORKSPACE_PATH = os.path.dirname(CURRENT_PATH)
 
 LOG_FORMATTER = "%(name)s | %(asctime)s | %(levelname)s | %(message)s"
 LOG_DIR = os.path.join(WORKSPACE_PATH, "logs")
-TMP_DIR = os.path.join(WORKSPACE_PATH, "tmp")
 os.makedirs(LOG_DIR, exist_ok=True)
-os.makedirs(TMP_DIR, exist_ok=True)
 
-DEBUG_CHAT_ID = "-907878930"
+# Path to the static folder, maps should be placed here.
+STATIC_DIR = os.path.join(WORKSPACE_PATH, "src", "static")
+os.makedirs(STATIC_DIR, exist_ok=True)
+
+# Chat IDs with volunteers and staff.
 TEAM_CHAT_ID = "-937192524"
 
+# Difference between time on host in comparsion to local time.
 HOUR_SHIFT = datetime.utcnow().hour - datetime.now().hour + 3
+
+# How often the map should be updated.
+MAP_TICKRATE = "*/1 * * * *"
+
+# Paths to the env files.
+# * Important: if the prod.env file exists, the app will run in prod mode.
+DEV_ENV_FILE = os.path.join(WORKSPACE_PATH, "dev.env")
+PROD_ENV_FILE = os.path.join(WORKSPACE_PATH, "prod.env")
 
 
 class Logger(logging.getLoggerClass()):
@@ -40,12 +50,6 @@ class Logger(logging.getLoggerClass()):
         today = datetime.now().strftime("%Y-%m-%d")
         log_file = os.path.join(LOG_DIR, f"{today}.txt")
         return log_file
-
-
-DEV_ENV_FILE = os.path.join(WORKSPACE_PATH, "dev.env")
-PROD_ENV_FILE = os.path.join(WORKSPACE_PATH, "prod.env")
-
-MAP_TICKRATE = "*/5 * * * *"
 
 
 def is_dev_mode():
@@ -85,7 +89,6 @@ class State:
         self.dev_mode = is_dev_mode()
 
         self.Bot = self.Bot()
-
         self.DataBase = self.DataBase()
         self.Race = self.Race()
 
@@ -98,6 +101,7 @@ class State:
 logger = Logger(__name__)
 AppState = State()
 
+# Credentials for payments message.
 SBP_PHONE = os.getenv("SBP_PHONE")
 SBP_BANKS = os.getenv("SBP_BANKS")
 SBP_CRED = os.getenv("SBP_CRED")
