@@ -61,12 +61,12 @@ class Race(Document):
     registration_open = BooleanField(default=True)
 
     participants = ListField(ReferenceField(User))
-    participant_info = ListField(
+    participants_infos = ListField(
         DictField(
             fields={
                 "telegram_id": IntField(required=True),
                 "category": StringField(required=True),
-                "race_number": StringField(required=False),
+                "race_number": StringField(default="N/A"),
             },
         )
     )
@@ -112,6 +112,12 @@ async def get_user(telegram_id):
         )
 
     return user
+
+
+async def get_participant_info(race, telegram_id):
+    for participant_info in race.participants_infos:
+        if participant_info["telegram_id"] == telegram_id:
+            return participant_info["category"], participant_info["race_number"]
 
 
 async def get_user_by_fatracing_id(fatracing_id):
@@ -205,7 +211,7 @@ async def register_to_race(telegram_id, race_name, category):
 
     if user and race:
         race.participants.append(user)
-        race.participant_info.append(participant_info)
+        race.participants_infos.append(participant_info)
         race.save()
 
         logger.debug(

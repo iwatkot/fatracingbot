@@ -1,5 +1,3 @@
-import io
-import os
 import secrets
 
 from enum import Enum
@@ -7,11 +5,10 @@ from re import escape, match
 from datetime import datetime
 
 from aiogram import Bot, Dispatcher, executor, types
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, InputFile
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton  # InputFile
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.dispatcher.filters import Text
 from aiocron import crontab
-from PIL import Image
 
 import folium
 import validators
@@ -558,24 +555,61 @@ async def translation(message: types.Message):
     if not message.location.live_period:
         return
 
-    logger.info(
-        f"User {message.from_user.id} sent live location. "
-        f"Lat: {message.location.latitude}, Lon: {message.location.longitude}"
-    )
-
-    g.AppState.location_data[message.from_user.id] = [
-        message.location.latitude,
-        message.location.longitude,
-    ]
+    coordinates = [message.location.latitude, message.location.longitude]
 
     logger.debug(
-        f"Saved location data for user {message.from_user.id} in global state."
+        f"Received live coordinates from telegram id {message.from_user.id}: {coordinates}."
     )
+
+    race = g.AppState.Race.info
+
+    if not race:
+        logger.debug(
+            "Live coordinates received, but there's no active race at the moment."
+        )
+        return
+
+    if not g.AppState.location_data.get(message.from_user.id):
+        logger.debug(
+            f"User {message.from_user.id} is not in location_data, will create it."
+        )
+
+        user = await db.get_user(message.from_user.id)
+        category, race_number = await db.get_participant_info(
+            race, message.from_user.id
+        )
+
+        user_info = {
+            "full_name": f"{user.last_name} {user.first_name}",
+            "category": category,
+            "race_number": race_number,
+            "coordinates": coordinates,
+        }
+
+        g.AppState.location_data[message.from_user.id] = user_info
+
+        logger.debug(f"User info saved in global state: {user_info}.")
+    else:
+        logger.debug(
+            f"User {message.from_user.id} is in location_data, will update coordinates."
+        )
+
+        g.AppState.location_data[message.from_user.id]["coordinates"] = coordinates
 
 
 #####################################
 ######## * Crontab handlers #########
 #####################################
+
+# ? Code for testing
+# LAT, LON = 36.62777015007213, 31.76627313050468
+# m = folium.Map(location=[LAT, LON], zoom_start=13)
+# folium.Marker(
+#    [LAT, LON],
+#    icon=folium.Icon(icon="glyphicon glyphicon-record", color="red"),
+#    popup="Test",
+# ).add_to(m)
+# m.save("map.html")
 
 
 @crontab(g.MAP_TICKRATE)
@@ -591,10 +625,22 @@ async def race_map_create():
         return
 
     location = g.AppState.Race.info.location
-
     m = folium.Map(location=location, zoom_start=13)
-    for telegram_id, coords in g.AppState.location_data.items():
-        folium.Marker(coords, popup=telegram_id).add_to(m)
+
+    for telegram_id, user_data in g.AppState.location_data.items():
+        description = (
+            f"<b>Имя:</b> {user_data['full_name']}<br>"
+            f"<b>Категория:</b> {user_data['category']}<br>"
+            f"<b>Номер:</b> {user_data['race_number']}\n"
+        )
+
+        folium.Marker(
+            location=user_data["coordinates"],
+            popup=folium.Popup(html=description, max_width=300),
+            icon=folium.Icon(icon="glyphicon glyphicon-record", color="red"),
+        ).add_to(m)
+
+    m.save("map.html")
 
     logger.debug(f"Map created, added {len(g.AppState.location_data)} markers.")
 
@@ -603,6 +649,10 @@ async def race_map_create():
     ###### ! DELETE IN PRODUCTION #######
     #### ! BECAUSE ITS SLOW AS HELL #####
     #####################################
+
+    # import io
+    # import os
+    # from PIL import Image
 
     # img_data = m._to_png(5)
     # img = Image.open(io.BytesIO(img_data))

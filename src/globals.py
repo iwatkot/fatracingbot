@@ -92,7 +92,7 @@ class State:
         self.user_data = {}
         self.user_edit_field = None
 
-        self.location_data = defaultdict(list)
+        self.location_data = {}
 
 
 logger = Logger(__name__)
