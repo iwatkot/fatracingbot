@@ -15,6 +15,8 @@ os.makedirs(LOG_DIR, exist_ok=True)
 STATIC_DIR = os.path.join(WORKSPACE_PATH, "src", "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
 
+GPX_DIR = os.path.join(WORKSPACE_PATH, "gpx")
+
 # Chat IDs with volunteers and staff.
 TEAM_CHAT_ID = "-937192524"
 
