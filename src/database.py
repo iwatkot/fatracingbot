@@ -247,7 +247,7 @@ def get_day(dt: str = None):
 
 
 categories = ["М: CX / Gravel", "М: Road", "Ж: CX / Gravel", "Ж: Road"]
-start = datetime.strptime("24.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
+start = datetime.strptime("26.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
     hours=g.HOUR_SHIFT
 )
 
@@ -255,12 +255,14 @@ start = datetime.strptime("24.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
 TDS_COORDS = [58.649757, 31.459013]
 TDS_CODE = "TDS"
 
+TEST_COORDS = [36.629652557353594, 31.775350128089276]
+TEST_CODE = "TEST"
 
 new_race = {
-    "name": "Tour De Selishi 2023",
+    "name": "TEST",
     "start": start,
-    "location": TDS_COORDS,
-    "code": TDS_CODE,
+    "location": TEST_COORDS,
+    "code": TEST_CODE,
     "categories": categories,
     "distance": 50.2,
     "price": 1000,

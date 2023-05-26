@@ -8,3 +8,5 @@ __pycache__/
 tmp/
 maps/
 src/static/
+gh/
+tracks/

@@ -15,7 +15,15 @@ os.makedirs(LOG_DIR, exist_ok=True)
 STATIC_DIR = os.path.join(WORKSPACE_PATH, "src", "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
 
-GPX_DIR = os.path.join(WORKSPACE_PATH, "gpx")
+TRACKS_DIR = os.path.join(WORKSPACE_PATH, "tracks")
+os.makedirs(TRACKS_DIR, exist_ok=True)
+
+JSON_DIR = os.path.join(WORKSPACE_PATH, "json")
+os.makedirs(JSON_DIR, exist_ok=True)
+
+GH_DIR = os.path.join(WORKSPACE_PATH, "gh")
+os.makedirs(GH_DIR, exist_ok=True)
+REPO_URL = "https://github.com/iwatkot/fatracks.git"
 
 # Chat IDs with volunteers and staff.
 TEAM_CHAT_ID = "-937192524"
@@ -27,7 +35,7 @@ HOUR_SHIFT = datetime.utcnow().hour - datetime.now().hour + 3
 MAP_TICKRATE = "*/1 * * * *"
 
 # Paths to the env files.
-# * Important: if the prod.env file exists, the app will run in prod mode.
+# * Important: if the dev.env file exists, the app will run in dev mode.
 DEV_ENV_FILE = os.path.join(WORKSPACE_PATH, "dev.env")
 PROD_ENV_FILE = os.path.join(WORKSPACE_PATH, "prod.env")
 
@@ -85,6 +93,8 @@ class State:
         def __init__(self):
             self.info = None
             self.ongoing = False
+            self.location_data = {}
+            self.leaderboard = []
 
     def __init__(self):
         # Reads .env files and saved the app mode, must be run first.
@@ -96,8 +106,6 @@ class State:
 
         self.user_data = {}
         self.user_edit_field = None
-
-        self.location_data = {}
 
 
 logger = Logger(__name__)

@@ -1,5 +1,5 @@
 import secrets
-import os
+import asyncio
 
 from enum import Enum
 from re import escape, match
@@ -11,16 +11,13 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton  # InputFile
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from aiogram.dispatcher.filters import Text
-from aiocron import crontab
-
-import folium
 
 # import validators
 
 import globals as g
 import database as db
-
 import webserver as ws
+import track as tr
 
 logger = g.Logger(__name__)
 
@@ -421,17 +418,11 @@ async def button_translation(message: types.Message):
         await bot.send_message(message.from_user.id, Messages.ONLY_FOR_REGISTERED.value)
         return
 
-    #####################################
-    #### ! UNCOMMENT AFTER TDS RACE #####
-    #####################################
-    # if user not in race.participants:
-    #    await bot.send_message(
-    #        message.from_user.id, Messages.ONLY_FOR_PARTICIPANTS.value
-    #    )
-    #    return
-    #####################################
-    ### ! ENDBLOCK UNCOMMENT AFTER TDS ##
-    #####################################
+    if user not in race.participants:
+        await bot.send_message(
+            message.from_user.id, Messages.ONLY_FOR_PARTICIPANTS.value
+        )
+        return
 
     reply += Messages.TRANSLATION_REQUEST.escaped()
     reply_markup = await keyboard({"location_translation": "Трансляция геолокации"})
@@ -445,7 +436,7 @@ async def button_translation(message: types.Message):
 async def button_need_help(message: types.Message):
     await log_event(message)
 
-    coords = g.AppState.location_data.get(message.from_user.id)
+    coords = g.AppState.Race.location_data.get(message.from_user.id)
 
     if not coords:
         # TODO: ask for location with registered next handler
@@ -575,15 +566,27 @@ async def translation(message: types.Message):
         )
         return
 
-    if not g.AppState.location_data.get(message.from_user.id):
+    if not g.AppState.Race.location_data.get(message.from_user.id):
         logger.debug(
             f"User {message.from_user.id} is not in location_data, will create it."
         )
 
         user = await db.get_user(message.from_user.id)
-        category, race_number = await db.get_participant_info(
-            race, message.from_user.id
-        )
+        if not user:
+            logger.warning(
+                f"Can't find the user with telegram id {message.from_user.id} in database."
+            )
+            return
+
+        try:
+            category, race_number = await db.get_participant_info(
+                race, message.from_user.id
+            )
+        except ValueError:
+            logger.warning(
+                f"Can't find the user {user.first_name} {user.last_name} in participants list."
+            )
+            return
 
         user_info = {
             "full_name": f"{user.last_name} {user.first_name}",
@@ -592,7 +595,7 @@ async def translation(message: types.Message):
             "coordinates": coordinates,
         }
 
-        g.AppState.location_data[message.from_user.id] = user_info
+        g.AppState.Race.location_data[message.from_user.id] = user_info
 
         logger.debug(f"User info saved in global state: {user_info}.")
     else:
@@ -600,50 +603,12 @@ async def translation(message: types.Message):
             f"User {message.from_user.id} is in location_data, will update coordinates."
         )
 
-        g.AppState.location_data[message.from_user.id]["coordinates"] = coordinates
+        g.AppState.Race.location_data[message.from_user.id]["coordinates"] = coordinates
 
 
 #####################################
 ######## * Crontab handlers #########
 #####################################
-
-
-@crontab(g.MAP_TICKRATE)
-async def race_map_create():
-    logger.debug("Crontab rule for race map creation triggered.")
-
-    if not (g.AppState.Race.info and g.AppState.Race.ongoing):
-        logger.debug("There's no active race at the moment.")
-        return
-
-    if not g.AppState.location_data:
-        logger.debug("Race is active, but no location data received yet.")
-        return
-
-    location = g.AppState.Race.info.location
-    m = folium.Map(location=location, zoom_start=13)
-
-    for telegram_id, user_data in g.AppState.location_data.items():
-        description = (
-            f"<b>Имя:</b> {user_data['full_name']}<br>"
-            f"<b>Категория:</b> {user_data['category']}<br>"
-            f"<b>Номер:</b> {user_data['race_number']}\n"
-        )
-
-        folium.Marker(
-            location=user_data["coordinates"],
-            popup=folium.Popup(html=description, max_width=300),
-            icon=folium.Icon(icon="glyphicon glyphicon-record", color="red"),
-        ).add_to(m)
-
-    race_code = g.AppState.Race.info.code
-    map_save_path = os.path.join(g.STATIC_DIR, f"{race_code}_map.html")
-
-    m.save(map_save_path)
-
-    logger.debug(
-        f"Map created, added {len(g.AppState.location_data)} markers. Saved to {map_save_path}."
-    )
 
 
 #####################################
@@ -1049,7 +1014,7 @@ async def send_sos_message(message: types.Message):
 
     await bot.send_message(g.TEAM_CHAT_ID, sos, parse_mode="MarkdownV2")
 
-    latitude, longitude = g.AppState.location_data.get(message.from_user.id)
+    latitude, longitude = g.AppState.Race.location_data.get(message.from_user.id)
 
     await bot.send_location(g.TEAM_CHAT_ID, latitude, longitude)
 
@@ -1127,7 +1092,16 @@ async def not_implemented(message: types.Message):
     await bot.send_message(message.from_user.id, "Фунция еще не реализована.")
 
 
+async def on_startup():
+    logger.info("Starting up the main module...")
+    await tr.prepare_json_tracks()
+    bot_info = await bot.get_me()
+    logger.info(f"Bot started. Username: {bot_info.username}, ID: {bot_info.id}.")
+
+
 if __name__ == "__main__":
+    loop = asyncio.get_event_loop()
+    loop.run_until_complete(on_startup())
     ws_process = Process(target=ws.launch)
     ws_process.start()
     executor.start_polling(dp)

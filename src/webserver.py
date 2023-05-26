@@ -1,4 +1,6 @@
 import logging
+import json
+import os
 
 from flask import Flask, render_template
 
@@ -27,11 +29,29 @@ def index():
 
 @app.route("/live", methods=["GET"])
 def tds_map():
-    context = {"title": "Тур де Селищи 2023"}
-    leaderboard_all = racers_debug_data
+    if g.AppState.Race.info:
+        context = {"title": g.AppState.Race.info.name}
+        race_code = g.AppState.Race.info.code
+    else:
+        # ! Debug
+        context = {"title": "Велогонки в Великом Новгороде"}
+        race_code = "TEST"
+
+    map_path = f"/static/{race_code}_map.html"
+    json_path = os.path.join(g.JSON_DIR, f"{race_code}_leaderboard_all.json")
+
+    if not os.path.exists(json_path):
+        logger.warning(f"Leaderboard file {json_path} not found.")
+        leaderboard_all = []
+    else:
+        with open(json_path, "r") as json_file:
+            leaderboard_all = json.load(json_file)
 
     return render_template(
-        "race_live.html", context=context, leaderboard_all=leaderboard_all
+        "race_live.html",
+        context=context,
+        leaderboard_all=leaderboard_all,
+        map_path=map_path,
     )
 
 
@@ -40,36 +60,3 @@ def launch():
     logger.info(f"Starting webserver on port {port}.")
     app.run(port=port, host="0.0.0.0")
     logger.warning("Webserver stopped.")
-
-
-###############################
-####### * DEBUG DATA ##########
-###############################
-
-
-racers_debug_data = [
-    {
-        "row_number": 1,
-        "distance": "23 км",
-        "category": "CX / Gravel",
-        "race_number": 202,
-        "first_name": "Иван",
-        "last_name": "Иванов",
-    },
-    {
-        "row_number": 2,
-        "distance": "21 км",
-        "category": "Road",
-        "race_number": 103,
-        "first_name": "Петр",
-        "last_name": "Петров",
-    },
-    {
-        "row_number": 3,
-        "distance": "19 км",
-        "category": "MTB",
-        "race_number": 304,
-        "first_name": "Сидор",
-        "last_name": "Сидоров",
-    },
-]
