@@ -83,16 +83,16 @@ def track_distance(track, coordinates):
 
     logger.debug(f"Closest point on track for {coordinates} is {closest_point}.")
 
-    distance = 0.0
+    track_distance = 0.0
     for i in range(closest_point_index):
         point1 = track[i]
         point2 = track[i + 1]
         distance = geodesic(point1, point2).kilometers
-        distance += distance
+        track_distance += distance
 
     logger.debug(f"Distance along track for {coordinates} is {distance} km.")
 
-    return round(distance, 2)
+    return round(track_distance, 2)
 
 
 @crontab(g.MAP_TICKRATE)
