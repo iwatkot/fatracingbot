@@ -4,9 +4,9 @@ import os
 
 from flask import Flask, render_template
 
-import globals as g
-
 from flask_bootstrap import Bootstrap4
+
+import globals as g
 
 flask_log = logging.getLogger("werkzeug")
 flask_log.disabled = True
@@ -28,23 +28,29 @@ def index():
 
 
 @app.route("/live", methods=["GET"])
-def tds_map():
-    if g.AppState.Race.info:
-        context = {"title": g.AppState.Race.info.name}
-        race_code = g.AppState.Race.info.code
+def live():
+    if not os.path.exists(g.JSON_RACE_INFO):
+        logger.warning("JSON race info file wasn't found. No active races.")
+        return render_template("race_not.html")
     else:
-        # ! Debug
-        context = {"title": "Велогонки в Великом Новгороде"}
-        race_code = "TEST"
+        with open(g.JSON_RACE_INFO, "r") as race_info_file:
+            race_info = json.load(race_info_file)
+
+    race_code = race_info["code"]
+    context = {
+        "title": race_info["name"],
+    }
+
+    logger.debug(f"Loaded JSON race info file. Race with code {race_code} is active.")
 
     map_path = f"/static/{race_code}_map.html"
-    json_path = os.path.join(g.JSON_DIR, f"{race_code}_leaderboard_all.json")
+    leaderboard_all_path = os.path.join(g.JSON_DIR, f"{race_code}_leaderboard_all.json")
 
-    if not os.path.exists(json_path):
-        logger.warning(f"Leaderboard file {json_path} not found.")
+    if not os.path.exists(leaderboard_all_path):
+        logger.warning(f"Leaderboard file {leaderboard_all_path} not found.")
         leaderboard_all = []
     else:
-        with open(json_path, "r") as json_file:
+        with open(leaderboard_all_path, "r") as json_file:
             leaderboard_all = json.load(json_file)
 
     return render_template(

@@ -20,6 +20,7 @@ os.makedirs(TRACKS_DIR, exist_ok=True)
 
 JSON_DIR = os.path.join(WORKSPACE_PATH, "json")
 os.makedirs(JSON_DIR, exist_ok=True)
+JSON_RACE_INFO = os.path.join(JSON_DIR, "race_info.json")
 
 GH_DIR = os.path.join(WORKSPACE_PATH, "gh")
 os.makedirs(GH_DIR, exist_ok=True)

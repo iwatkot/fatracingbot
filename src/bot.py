@@ -1,5 +1,7 @@
 import secrets
 import asyncio
+import json
+import os
 
 from enum import Enum
 from re import escape, match
@@ -801,6 +803,17 @@ async def callback_race_start_init(callback_query: types.CallbackQuery):
     g.AppState.Race.info = race
     g.AppState.Race.ongoing = True
 
+    json_race_info = {
+        "name": race.name,
+        "code": race.code,
+        "ongoing": True,
+    }
+
+    with open(g.JSON_RACE_INFO, "w") as f:
+        json.dump(json_race_info, f)
+
+    logger.info(f"JSON race info is saved in {g.JSON_RACE_INFO}.")
+
     await bot.send_message(
         callback_query.from_user.id, Messages.ADMIN_RACE_STARTED.value
     )
@@ -827,6 +840,8 @@ async def callback_race_end_init(callback_query: types.CallbackQuery):
             callback_query.from_user.id,
             Messages.ADMIN_RACE_END.value,
         )
+
+    await clean_up()
 
 
 #####################################
@@ -1099,9 +1114,29 @@ async def on_startup():
     logger.info(f"Bot started. Username: {bot_info.username}, ID: {bot_info.id}.")
 
 
+async def clean_up():
+    logger.debug("Cleaning up JSON and map files...")
+
+    deleted = 0
+    for filename in os.listdir(g.JSON_DIR):
+        os.remove(os.path.join(g.JSON_DIR, filename))
+        deleted += 1
+
+    logger.debug(f"Deleted {deleted} files from {g.JSON_DIR}.")
+
+    deleted = 0
+    for filename in os.listdir(g.STATIC_DIR):
+        if filename.endswith("_map.html"):
+            os.remove(os.path.join(g.STATIC_DIR, filename))
+            deleted += 1
+
+    logger.debug(f"Deleted {deleted} files from {g.STATIC_DIR}.")
+
+
 if __name__ == "__main__":
     loop = asyncio.get_event_loop()
     loop.run_until_complete(on_startup())
+    loop.run_until_complete(clean_up())
     ws_process = Process(target=ws.launch)
     ws_process.start()
     executor.start_polling(dp)

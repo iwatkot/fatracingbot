@@ -247,7 +247,7 @@ def get_day(dt: str = None):
 
 
 categories = ["М: CX / Gravel", "М: Road", "Ж: CX / Gravel", "Ж: Road"]
-start = datetime.strptime("26.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
+start = datetime.strptime("27.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
     hours=g.HOUR_SHIFT
 )
 
