@@ -53,6 +53,8 @@ def live():
         with open(leaderboard_all_path, "r") as json_file:
             leaderboard_all = json.load(json_file)
 
+    logger.debug(f"Loaded leaderboard with {len(leaderboard_all)} entries.")
+
     return render_template(
         "race_live.html",
         context=context,

@@ -2,6 +2,7 @@ import os
 import gpxpy
 import folium
 import json
+from collections import namedtuple
 from geopy.distance import geodesic
 from aiocron import crontab
 from git import Repo
@@ -126,32 +127,33 @@ async def race_map_create():
 
     folium.PolyLine(track).add_to(m)
 
-    g.AppState.Race.leaderboard = []
+    raw_leaderboard = []
 
-    for telegram_id, user_data in g.AppState.Race.location_data.items():
+    for telegram_id, user_info in g.AppState.Race.location_data.items():
         description = (
-            f"<b>Имя:</b> {user_data['full_name']}<br>"
-            f"<b>Категория:</b> {user_data['category']}<br>"
-            f"<b>Номер:</b> {user_data['race_number']}\n"
+            f"<b>Имя:</b> {user_info['full_name']}<br>"
+            f"<b>Категория:</b> {user_info['category']}<br>"
+            f"<b>Номер:</b> {user_info['race_number']}\n"
         )
 
+        coordinates = user_info["coordinates"]
+
         folium.Marker(
-            location=user_data["coordinates"],
+            location=coordinates,
             popup=folium.Popup(html=description, max_width=300),
             icon=folium.Icon(icon="glyphicon glyphicon-record", color="red"),
         ).add_to(m)
 
-        logger.debug(f"Added marker for {user_data['full_name']}.")
+        logger.debug(f"Added marker for {user_info['full_name']}.")
 
-        coordinates = user_data["coordinates"]
         distance = track_distance(track, coordinates)
-        leaderboard_entry = user_data.copy()
+        leaderboard_entry = user_info.copy()
         leaderboard_entry["distance"] = distance
 
-        g.AppState.Race.leaderboard.append(leaderboard_entry)
+        raw_leaderboard.append(leaderboard_entry)
 
         logger.debug(
-            f"Added {user_data['full_name']} to leaderboard with distance {distance}."
+            f"Added {user_info['full_name']} to leaderboard with distance {distance}."
         )
 
     map_save_path = os.path.join(g.STATIC_DIR, f"{race_code}_map.html")
@@ -162,19 +164,19 @@ async def race_map_create():
         f"Map created, added {len(g.AppState.Race.location_data)} markers. Saved to {map_save_path}."
     )
 
-    await build_leaderboard()
+    await build_leaderboard(raw_leaderboard)
 
 
-async def build_leaderboard():
-    if not (g.AppState.Race.leaderboard and g.AppState.Race.info):
+async def build_leaderboard(raw_leaderboard):
+    if not g.AppState.Race.info:
         return
 
-    leaderboard_data = sorted(g.AppState.Race.leaderboard, key=lambda x: x["distance"])
+    raw_leaderboard = sorted(raw_leaderboard, key=lambda x: x["distance"])
 
-    logger.debug(f"Sorted leaderboard data with {len(leaderboard_data)} entries.")
+    logger.debug(f"Sorted leaderboard data with {len(raw_leaderboard)} entries.")
 
     leaderboard = []
-    for idx, entry in enumerate(leaderboard_data):
+    for idx, entry in enumerate(raw_leaderboard):
         leaderboard.append(
             {
                 "row_number": idx + 1,
