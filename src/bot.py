@@ -8,7 +8,6 @@ from re import escape, match
 from datetime import datetime
 
 from multiprocessing import Process
-from collections import namedtuple
 
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton  # InputFile

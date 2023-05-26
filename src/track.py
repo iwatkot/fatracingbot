@@ -2,7 +2,6 @@ import os
 import gpxpy
 import folium
 import json
-from collections import namedtuple
 from geopy.distance import geodesic
 from aiocron import crontab
 from git import Repo
