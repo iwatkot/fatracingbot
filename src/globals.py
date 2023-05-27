@@ -2,7 +2,7 @@ import os
 import sys
 from pytz import timezone
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
@@ -33,10 +33,9 @@ TEAM_CHAT_ID = "-937192524"
 
 async def get_time_shift():
     moscow_timezone = timezone("Europe/Moscow")
-    moscow_time = datetime.now(moscow_timezone)
     utc_time = datetime.utcnow()
 
-    hour_shift = moscow_time.hour - utc_time.hour
+    hour_shift = int(moscow_timezone.utcoffset(utc_time) / timedelta(hours=1))
 
     logger.info(f"Time shift between UTC and Moscow time is {hour_shift} hours.")
 

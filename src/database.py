@@ -297,26 +297,22 @@ def get_day(dt: str = None):
     return day
 
 
-categories = ["М: CX / Gravel", "М: Road", "Ж: CX / Gravel", "Ж: Road"]
-start = datetime.strptime("27.05.2023 16:00", "%d.%m.%Y %H:%M")
-
-print(start)
-
-
-TDS_COORDS = [58.649757, 31.459013]
-TDS_CODE = "TDS"
-
-TEST_COORDS = [36.629652557353594, 31.775350128089276]
-TEST_CODE = "HIKE"
+name = "FATRACING RAZDELKA CUP"
+categories = ["М: ШОССЕ", "М: ЦК", "М: ФИКС СИНГЛ", "Ж: ЖЕНЩИНЫ"]
+start = datetime.strptime("28.05.2023 08:00", "%d.%m.%Y %H:%M")
+location = [58.46819985377836, 31.25682260802916]
+code = "RAZDELKA"
+distance = 20
+price = 100
 
 new_race = {
-    "name": "TEST HIKE",
+    "name": name,
     "start": start,
-    "location": TEST_COORDS,
-    "code": TEST_CODE,
+    "location": location,
+    "code": code,
     "categories": categories,
-    "distance": 13.8,
-    "price": 1000,
+    "distance": distance,
+    "price": price,
 }
 
 # Race(**new_race).save()
