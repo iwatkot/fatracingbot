@@ -90,7 +90,7 @@ def track_distance(track, coordinates):
         distance = geodesic(point1, point2).kilometers
         track_distance += distance
 
-    logger.debug(f"Distance along track for {coordinates} is {distance} km.")
+    logger.debug(f"Distance along track for {coordinates} is {track_distance} km.")
 
     return round(track_distance, 2)
 
@@ -122,7 +122,7 @@ async def race_map_create():
 
     logger.debug(f"Loaded track with {len(track)} points from JSON file.")
 
-    m = folium.Map(location=location, zoom_start=10)
+    m = folium.Map(location=location, zoom_start=13)
 
     folium.PolyLine(track).add_to(m)
 

@@ -5,7 +5,7 @@ import os
 
 from enum import Enum
 from re import escape, match
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from multiprocessing import Process
 
@@ -126,6 +126,12 @@ class Messages(Enum):
     ADMIN_NO_ACTIVE_RACE = "🚫 Нет активных гонок."
     ADMIN_RACE_END = "✅ Статус гонки успешно изменен на завершенный, трансляция геолокации остановлена."
 
+    ADMIN_TIMEKEEPING_INIT = (
+        "ℹ️ Включен режим записи результатов на финише. Бот будет ожидать сообщения с номером участника, "
+        "любые другие данные будут проигнорированы. Время будет подсчитано автоматически с момента старта гонки. "
+        "Чтобы выйти из режима, нажмите кнопку  `Завершить`. Вы сможете вернуться в этот режим в любой момент."
+    )
+
     def format(self, *args, **kwargs):
         return escape(self.value.format(*args, **kwargs))
 
@@ -165,6 +171,9 @@ class Buttons(Enum):
 
     # * Events menu buttons.
     UPCOMING_EVENTS = "Предстоящие гонки"
+
+    # * Admin events menu buttons.
+    ADMIN_UPCOMING_EVENTS = "Созданные гонки"
 
     # * Admin menu buttons.
     BTN_MANAGE_RACE = "Управление гонкой"
@@ -207,6 +216,7 @@ class Buttons(Enum):
 
     # * Admin menu.
     MN_ADMIN = [BTN_MANAGE_RACE, BTN_MANAGE_PAYMENTS, BTN_MANAGE_EVENTS, BTN_MAIN]
+    MN_ADMIN_EVENTS = [ADMIN_UPCOMING_EVENTS, BTN_MAIN]
 
     # ? Not implemented list of buttons.
     NOT_IMPLEMENTED = [BTN_ACCOUNT_RESULTS, BTN_LEADERBOARD, BTN_YOUR_STATUS, BTN_INFO]
@@ -410,9 +420,12 @@ async def button_translation(message: types.Message):
         await bot.send_message(message.from_user.id, Messages.NO_RACE.value)
         return
 
+    start_time = await add_hour_shift(race.start)
+    start_time = start_time.strftime("%H:%M")
+
     reply = escape(
         f"Сегодня проводится гонка  `{race.name}`\n\n"
-        f"Старт:  `{datetime.strftime(race.start, '%H:%M')}` \nДистанция:  `{race.distance} км`"
+        f"Старт:  `{start_time}` \nДистанция:  `{race.distance} км`"
     )
 
     user = await db.get_user(message.from_user.id)
@@ -457,7 +470,9 @@ async def button_need_help(message: types.Message):
 #####################################
 
 
-@dp.message_handler(Text(equals=Buttons.UPCOMING_EVENTS.value))
+@dp.message_handler(
+    Text(equals=[Buttons.UPCOMING_EVENTS.value, Buttons.ADMIN_UPCOMING_EVENTS.value])
+)
 async def button_upcoming_events(message: types.Message):
     await log_event(message)
 
@@ -472,9 +487,17 @@ async def button_upcoming_events(message: types.Message):
     events_data = {}
 
     for event in events:
-        date = event.start.strftime("%d.%m.%Y")
+        start_time = await add_hour_shift(event.start)
+        date = start_time.strftime("%d.%m.%Y")
+
         text = f"{date} - {event.name}"
-        callback_data = f"race_info_{event.name}"
+
+        if message.text == Buttons.ADMIN_UPCOMING_EVENTS.value and await is_admin(
+            message
+        ):
+            callback_data = f"race_admin_info_{event.name}"
+        else:
+            callback_data = f"race_info_{event.name}"
         events_data[callback_data] = text
 
     reply_markup = await keyboard(events_data)
@@ -504,9 +527,12 @@ async def button_manage_race(message: types.Message):
         )
         return
 
+    start_time = await add_hour_shift(race.start)
+    start = start_time.strftime("%d.%m.%Y %H:%M")
+
     reply = Messages.RACE_INFO.format(
         name=race.name,
-        start=race.start.strftime("%d.%m.%Y %H:%M"),
+        start=start,
         distance=race.distance,
         categories=", ".join(race.categories),
     )
@@ -521,6 +547,23 @@ async def button_manage_race(message: types.Message):
 
     await bot.send_message(
         message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
+    )
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_MANAGE_EVENTS.value))
+async def button_admin_events(message: types.Message):
+    await log_event(message)
+
+    if not await is_admin(message):
+        return
+
+    reply_markup = await keyboard(Buttons.MN_ADMIN_EVENTS.value)
+
+    await bot.send_message(
+        message.from_user.id,
+        Messages.MENU_CHANGED.format(message.text),
+        reply_markup=reply_markup,
+        parse_mode="MarkdownV2",
     )
 
 
@@ -584,9 +627,15 @@ async def translation(message: types.Message):
             category, race_number = await db.get_participant_info(
                 race, message.from_user.id
             )
-        except ValueError:
+        except Exception:
             logger.warning(
                 f"Can't find the user {user.first_name} {user.last_name} in participants list."
+            )
+            return
+
+        if await is_finished(race_number):
+            logger.debug(
+                f"User {message.from_user.id} already finished, will not save coordinates."
             )
             return
 
@@ -601,6 +650,15 @@ async def translation(message: types.Message):
 
         logger.debug(f"User info saved in global state: {user_info}.")
     else:
+        user_info = g.AppState.Race.location_data[message.from_user.id]
+        race_number = user_info["race_number"]
+
+        if await is_finished(race_number):
+            logger.debug(
+                f"User {message.from_user.id} already finished, will not save coordinates."
+            )
+            return
+
         logger.debug(
             f"User {message.from_user.id} is in location_data, will update coordinates."
         )
@@ -664,6 +722,82 @@ async def callback_location_translation(callback_query: types.CallbackQuery):
     )
 
 
+@dp.callback_query_handler(text_contains="race_close_registration_")
+async def race_close_registration(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    if not await is_admin(callback_query):
+        return
+
+    race_name = callback_query.data.rsplit("_", 1)[-1]
+    race = await db.get_upcoming_race_by_name(race_name)
+
+    race_number_data = await db.close_registration(race)
+
+    reply = "Регистрация закрыта.\nКоличество участников:\n"
+
+    for category, race_numbers in race_number_data.items():
+        reply += f"\n`{category}` : {len(race_numbers)}"
+
+    reply = escape(reply)
+
+    await bot.send_message(callback_query.from_user.id, reply, parse_mode="MarkdownV2")
+
+
+@dp.callback_query_handler(text_contains="race_open_registration_")
+async def race_open_registration(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    if not await is_admin(callback_query):
+        return
+
+    race_name = callback_query.data.rsplit("_", 1)[-1]
+    race = await db.get_upcoming_race_by_name(race_name)
+
+    await db.open_registration(race)
+
+    await bot.send_message(callback_query.from_user.id, "Регистрация открыта.")
+
+
+@dp.callback_query_handler(text_contains="race_admin_info_")
+async def callback_race_admin_info(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    if not await is_admin(callback_query):
+        return
+
+    race_name = callback_query.data.rsplit("_", 1)[-1]
+    race = await db.get_upcoming_race_by_name(race_name)
+
+    start_time = await add_hour_shift(race.start)
+    start = start_time.strftime("%d.%m.%Y %H:%M")
+
+    reply = Messages.RACE_INFO.format(
+        name=race.name,
+        start=start,
+        distance=race.distance,
+        categories=", ".join(race.categories),
+    )
+
+    status = race.registration_open
+
+    if status:
+        buttons = {
+            f"race_close_registration_{race_name}": "Закрыть регистрацию",
+        }
+    else:
+        buttons = {f"race_open_registration_{race_name}": "Открыть регистрацию"}
+
+    reply_markup = await keyboard(buttons)
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        reply,
+        parse_mode="MarkdownV2",
+        reply_markup=reply_markup,
+    )
+
+
 @dp.callback_query_handler(text_contains="race_info_")
 async def callback_race_info(callback_query: types.CallbackQuery):
     await log_event(callback_query)
@@ -671,9 +805,12 @@ async def callback_race_info(callback_query: types.CallbackQuery):
     race_name = callback_query.data.rsplit("_", 1)[-1]
     race = await db.get_upcoming_race_by_name(race_name)
 
+    start_time = await add_hour_shift(race.start)
+    start = start_time.strftime("%d.%m.%Y %H:%M")
+
     reply = Messages.RACE_INFO.format(
         name=race.name,
-        start=race.start.strftime("%d.%m.%Y %H:%M"),
+        start=start,
         distance=race.distance,
         categories=", ".join(race.categories),
     )
@@ -797,11 +934,16 @@ async def callback_race_start_init(callback_query: types.CallbackQuery):
 
     g.AppState.Race.info = race
     g.AppState.Race.ongoing = True
+    start_time = int(datetime.now().timestamp())
+    g.AppState.Race.start_time = start_time
+
+    logger.info(f"Race with name {race_name} started at epoch time: {start_time}.")
 
     json_race_info = {
         "name": race.name,
         "code": race.code,
         "ongoing": True,
+        "start_time": start_time,
     }
 
     with open(g.JSON_RACE_INFO, "w") as f:
@@ -812,6 +954,31 @@ async def callback_race_start_init(callback_query: types.CallbackQuery):
     await bot.send_message(
         callback_query.from_user.id, Messages.ADMIN_RACE_STARTED.value
     )
+
+
+@dp.callback_query_handler(text_contains="race_timekeeping_init_")
+async def callback_race_timepeeking_init(callback_query: types.CallbackQuery):
+    await log_event(callback_query)
+
+    if not await is_admin(callback_query):
+        return
+
+    race = g.AppState.Race.info
+
+    if not race:
+        await bot.send_message(callback_query.from_user.id, "Нет активной гонки.")
+        return
+
+    reply_markup = await keyboard([Buttons.BTN_COMPLETE.value])
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        Messages.ADMIN_TIMEKEEPING_INIT.escaped(),
+        parse_mode="MarkdownV2",
+        reply_markup=reply_markup,
+    )
+
+    dp.register_message_handler(timekeeping)
 
 
 @dp.callback_query_handler(text_contains="race_end_init_")
@@ -842,6 +1009,80 @@ async def callback_race_end_init(callback_query: types.CallbackQuery):
 #####################################
 ####### * Registered handlers #######
 #####################################
+
+
+async def timekeeping(message: types.Message):
+    await log_event(message)
+
+    if message.text == Buttons.BTN_COMPLETE.value:
+        dp.message_handlers.unregister(timekeeping)
+        await button_main(message)
+        return
+
+    try:
+        race_number = int(message.text)
+    except ValueError:
+        logger.error(f"Can't get int race number from {message.text}.")
+        return
+
+    finish_time = int(datetime.now().timestamp())
+    time_diff = finish_time - g.AppState.Race.start_time
+    race_time = timedelta(seconds=time_diff)
+
+    logger.info(
+        f"Finish epoch time: {finish_time}, time difference in seconds: {time_diff}, "
+        f"race time in human readable: {race_time}."
+    )
+
+    race = g.AppState.Race.info
+
+    participant_data = await db.get_participant_by_race_number(race, race_number)
+
+    if not participant_data:
+        logger.warning(f"Can't find participant with race number: {race_number}.")
+
+        race_entry = {
+            "race_number": race_number,
+            "race_time": race_time,
+        }
+        await bot.send_message(
+            message.from_user.id,
+            (
+                "Участник не найден, результат будет сохранен только с номером. "
+                f"Номер: {race_number}\nВремя: {race_time}"
+            ),
+        )
+    else:
+        participant, category = participant_data
+        full_name = f"{participant.last_name} {participant.first_name}"
+
+        logger.info(f"Found participant: {full_name} with race number: {race_number}.")
+
+        race_entry = {
+            "race_number": race_number,
+            "race_time": race_time,
+            "full_name": full_name,
+            "category": category,
+        }
+
+        await bot.send_message(
+            message.from_user.id,
+            (
+                f"Имя: {full_name}\nНомер: {race_number}\nКатегория: {category}\nВремя: {race_time}"
+            ),
+        )
+
+        for telegram_id, user_info in g.AppState.Race.location_data.items():
+            if user_info["race_number"] == race_number:
+                g.AppState.Race.location_data.pop(telegram_id)
+                logger.info(
+                    f"User with telegram id {telegram_id} and race number {race_number} removed from location data."
+                )
+                break
+
+    g.AppState.Race.finishers.append(race_entry)
+
+    logger.info(f"Added participant with race number {race_number} to finishers list.")
 
 
 async def edit_user(message: types.Message):
@@ -1034,6 +1275,19 @@ async def send_sos_message(message: types.Message):
 #####################################
 
 
+async def is_finished(race_number):
+    return any(
+        finisher.get("race_number") == race_number
+        for finisher in g.AppState.Race.finishers
+    )
+
+
+async def add_hour_shift(utc_time):
+    local_time = utc_time + timedelta(hours=g.HOUR_SHIFT)
+
+    return local_time
+
+
 async def get_user_json(telegram_id):
     user = await db.get_user(telegram_id)
     if not user:
@@ -1107,6 +1361,7 @@ async def on_startup():
     await tr.prepare_json_tracks()
     bot_info = await bot.get_me()
     logger.info(f"Bot started. Username: {bot_info.username}, ID: {bot_info.id}.")
+    g.HOUR_SHIFT = await g.get_time_shift()
 
 
 async def clean_up():

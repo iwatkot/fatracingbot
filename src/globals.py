@@ -1,5 +1,6 @@
 import os
 import sys
+from pytz import timezone
 import logging
 from datetime import datetime
 from dotenv import load_dotenv
@@ -29,8 +30,21 @@ REPO_URL = "https://github.com/iwatkot/fatracks.git"
 # Chat IDs with volunteers and staff.
 TEAM_CHAT_ID = "-937192524"
 
+
+async def get_time_shift():
+    moscow_timezone = timezone("Europe/Moscow")
+    moscow_time = datetime.now(moscow_timezone)
+    utc_time = datetime.utcnow()
+
+    hour_shift = moscow_time.hour - utc_time.hour
+
+    logger.info(f"Time shift between UTC and Moscow time is {hour_shift} hours.")
+
+    return hour_shift
+
+
 # Difference between time on host in comparsion to local time.
-HOUR_SHIFT = datetime.utcnow().hour - datetime.now().hour + 3
+HOUR_SHIFT = None
 
 # How often the map should be updated.
 MAP_TICKRATE = "*/1 * * * *"
@@ -96,6 +110,8 @@ class State:
             self.ongoing = False
             self.location_data = {}
             self.leaderboard = []
+            self.start_time = None
+            self.finishers = []
 
     def __init__(self):
         # Reads .env files and saved the app mode, must be run first.

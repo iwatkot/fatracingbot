@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from collections import namedtuple
+from collections import namedtuple, defaultdict
 
 from mongoengine import (
     connect,
@@ -66,7 +66,7 @@ class Race(Document):
             fields={
                 "telegram_id": IntField(required=True),
                 "category": StringField(required=True),
-                "race_number": StringField(default="N/A"),
+                "race_number": IntField(default=0),
             },
         )
     )
@@ -118,6 +118,14 @@ async def get_participant_info(race, telegram_id):
     for participant_info in race.participants_infos:
         if participant_info["telegram_id"] == telegram_id:
             return participant_info["category"], participant_info["race_number"]
+
+
+async def get_participant_by_race_number(race, race_number):
+    for participant, participant_info in zip(
+        race.participants, race.participants_infos
+    ):
+        if int(participant_info["race_number"]) == race_number:
+            return participant, participant_info["category"]
 
 
 async def get_user_by_fatracing_id(fatracing_id):
@@ -202,7 +210,6 @@ async def register_to_race(telegram_id, race_name, category):
     participant_info = {
         "telegram_id": telegram_id,
         "category": category,
-        "race_number": "N/A",
     }
 
     logger.debug(f"Prepared participant info: {participant_info}.")
@@ -230,11 +237,55 @@ async def register_to_race(telegram_id, race_name, category):
     return res
 
 
+async def open_registration(race):
+    logger.info(f"Trying to open race with name {race.name}.")
+
+    race.update(registration_open=True)
+    race.save()
+
+
+async def close_registration(race):
+    logger.info(f"Trying to close race with name {race.name}.")
+
+    race.update(registration_open=False)
+    race.save()
+
+    categories = race.categories
+    participant_infos = race.participants_infos
+
+    logger.info(
+        f"Race has {len(categories)} categories and {len(participant_infos)} participants."
+    )
+    race_number_data = defaultdict(list)
+    category_prefix = 1
+    for category in categories:
+        participant_number = 1
+        participants_by_category = [
+            participant
+            for participant in participant_infos
+            if participant["category"] == category
+        ]
+        for participant in participants_by_category:
+            race_number = f"{category_prefix}{str(participant_number).zfill(2)}"
+            participant["race_number"] = int(race_number)
+            participant_number += 1
+            race_number_data[category].append(race_number)
+        category_prefix += 1
+
+    race.save()
+
+    logger.info(
+        f"Closed registration and generate race numbers for {len(race_number_data)} categories."
+    )
+
+    return race_number_data
+
+
 def get_day(dt: str = None):
     Day = namedtuple("Day", ["begin", "now", "end"])
 
     if not dt:
-        dt = datetime.now() + timedelta(hours=g.HOUR_SHIFT)
+        dt = datetime.now() - timedelta(hours=g.HOUR_SHIFT)
     else:
         dt = datetime.strptime(f"{dt} 00:00", "%d.%m.%Y %H:%M")
 
@@ -247,24 +298,24 @@ def get_day(dt: str = None):
 
 
 categories = ["М: CX / Gravel", "М: Road", "Ж: CX / Gravel", "Ж: Road"]
-start = datetime.strptime("27.05.2023 23:50", "%d.%m.%Y %H:%M") + timedelta(
-    hours=g.HOUR_SHIFT
-)
+start = datetime.strptime("27.05.2023 16:00", "%d.%m.%Y %H:%M")
+
+print(start)
 
 
 TDS_COORDS = [58.649757, 31.459013]
 TDS_CODE = "TDS"
 
 TEST_COORDS = [36.629652557353594, 31.775350128089276]
-TEST_CODE = "TEST"
+TEST_CODE = "HIKE"
 
 new_race = {
-    "name": "TEST",
+    "name": "TEST HIKE",
     "start": start,
     "location": TEST_COORDS,
     "code": TEST_CODE,
     "categories": categories,
-    "distance": 50.2,
+    "distance": 13.8,
     "price": 1000,
 }
 
