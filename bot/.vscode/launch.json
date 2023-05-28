@@ -5,7 +5,7 @@
             "name": "FATRACING",
             "type": "python",
             "request": "launch",
-            "program": "${workspaceFolder}/bot.py",
+            "program": "${workspaceFolder}/main.py",
             "console": "integratedTerminal",
             "python": "${workspaceFolder}/.venv/bin/python"
         }
