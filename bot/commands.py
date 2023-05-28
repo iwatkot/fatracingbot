@@ -1,6 +1,9 @@
-from main import dp, bot
+from main import bot, dp
+import globals as g
 from templates import Messages, Buttons
 import utility
+
+logger = g.Logger(__name__)
 
 
 @dp.message_handler(commands=["start"])
