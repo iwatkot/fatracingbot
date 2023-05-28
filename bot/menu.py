@@ -37,7 +37,7 @@ async def button_account(message):
 
     await bot.send_message(
         message.from_user.id,
-        Messages.MENU_CHANGED.format(message.text),
+        "Вы перешли в личный кабинет.",
         reply_markup=reply_markup,
         parse_mode="MarkdownV2",
     )
@@ -82,7 +82,7 @@ async def button_admin(message):
 
     await bot.send_message(
         message.from_user.id,
-        Messages.MENU_CHANGED.format(message.text),
+        "Вы перешли в меню администратора.",
         reply_markup=reply_markup,
         parse_mode="MarkdownV2",
     )

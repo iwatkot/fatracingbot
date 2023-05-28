@@ -8,6 +8,7 @@ from main import bot, dp, clean_up
 import database as db
 import globals as g
 from templates import Messages, Buttons
+from menu import button_admin
 import utility
 
 logger = g.Logger(__name__)
@@ -246,7 +247,7 @@ async def timekeeping(message):
 
     if message.text == Buttons.BTN_COMPLETE.value:
         dp.message_handlers.unregister(timekeeping)
-        await button_main(message)
+        await button_admin(message)
         return
 
     try:

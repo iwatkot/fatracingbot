@@ -7,6 +7,7 @@ from main import bot, dp
 import database as db
 import globals as g
 from templates import Messages, Buttons
+from menu import button_account
 import utility
 
 logger = g.Logger(__name__)
@@ -145,7 +146,7 @@ async def register(message):
         g.AppState.user_data.pop(message.from_user.id, None)
 
         await bot.send_message(message.from_user.id, Messages.REG_CANCELLED.value)
-        await button_main(message)
+        await button_account(message)
 
         return
 
@@ -164,7 +165,7 @@ async def register(message):
             await db.new_user(**user)
 
             await bot.send_message(message.from_user.id, Messages.REG_SUCCESS.value)
-            await button_main(message)
+            await button_account(message)
 
             return
 
@@ -237,7 +238,7 @@ async def edit_user(message):
         dp.message_handlers.unregister(edit_user)
 
         await bot.send_message(message.from_user.id, Messages.EDIT_CANCELLED.value)
-        await button_main(message)
+        await button_account(message)
 
         return
 
@@ -288,6 +289,6 @@ async def edit_user(message):
         await db.update_user(message.from_user.id, **{field: value})
 
         await bot.send_message(message.from_user.id, Messages.EDIT_SUCCESS.value)
-        await button_main(message)
+        await button_account(message)
     else:
         await bot.send_message(message.from_user.id, reply, parse_mode="MarkdownV2")
