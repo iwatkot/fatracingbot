@@ -1,0 +1,13 @@
+__pycache__/
+.git/
+.venv/
+logs/
+.gitignore
+.flake8
+LICENSE.md
+README.md
+dev.env
+json/
+gh/
+json/
+tracks/
