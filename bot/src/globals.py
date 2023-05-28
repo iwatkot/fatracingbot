@@ -9,17 +9,17 @@ CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
 WORKSPACE_PATH = os.path.dirname(CURRENT_PATH)
 
 LOG_FORMATTER = "%(name)s | %(asctime)s | %(levelname)s | %(message)s"
-LOG_DIR = os.path.join(CURRENT_PATH, "logs")
+LOG_DIR = os.path.join(WORKSPACE_PATH, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 # Path to the static folder, maps should be placed here.
 # STATIC_DIR = os.path.join(WORKSPACE_PATH, "src", "static")
 # os.makedirs(STATIC_DIR, exist_ok=True)
 
-TRACKS_DIR = os.path.join(CURRENT_PATH, "tracks")
+TRACKS_DIR = os.path.join(WORKSPACE_PATH, "tracks")
 os.makedirs(TRACKS_DIR, exist_ok=True)
 
-JSON_DIR = os.path.join(CURRENT_PATH, "json")
+JSON_DIR = os.path.join(WORKSPACE_PATH, "json")
 os.makedirs(JSON_DIR, exist_ok=True)
 # JSON_RACE_INFO = os.path.join(JSON_DIR, "race_info.json")
 
@@ -50,8 +50,8 @@ MAP_TICKRATE = "*/1 * * * *"
 
 # Paths to the env files.
 # * Important: if the dev.env file exists, the app will run in dev mode.
-DEV_ENV_FILE = os.path.join(CURRENT_PATH, "dev.env")
-PROD_ENV_FILE = os.path.join(CURRENT_PATH, "prod.env")
+DEV_ENV_FILE = os.path.join(WORKSPACE_PATH, "dev.env")
+PROD_ENV_FILE = os.path.join(WORKSPACE_PATH, "prod.env")
 
 
 class Logger(logging.getLoggerClass()):
