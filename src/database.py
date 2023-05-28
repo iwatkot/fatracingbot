@@ -285,7 +285,7 @@ def get_day(dt: str = None):
     Day = namedtuple("Day", ["begin", "now", "end"])
 
     if not dt:
-        dt = datetime.now() + timedelta(hours=g.HOUR_SHIFT)
+        dt = datetime.now() - timedelta(hours=g.HOUR_SHIFT)
 
         print("DT: ", dt)
     else:
