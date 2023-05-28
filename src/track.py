@@ -170,7 +170,7 @@ async def build_leaderboard(raw_leaderboard):
     if not g.AppState.Race.info:
         return
 
-    raw_leaderboard = sorted(raw_leaderboard, key=lambda x: x["distance"])
+    raw_leaderboard = sorted(raw_leaderboard, key=lambda x: x["distance"], reverse=True)
 
     logger.debug(f"Sorted leaderboard data with {len(raw_leaderboard)} entries.")
 
