@@ -893,17 +893,22 @@ async def callback_race_register(callback_query: types.CallbackQuery):
     race = await db.get_upcoming_race_by_name(race_name)
 
     if await db.register_to_race(callback_query.from_user.id, race_name, category):
-        reply = Messages.PAYMENT_INSTRUCTIONS.format(
-            price=race.price,
-            phone=g.SBP_PHONE,
-            banks=g.SBP_BANKS,
-            cred=g.SBP_CRED,
-        )
+        ##############################
+        #### ! Uncomment after TDS ###
+        ##############################
+        # reply = Messages.PAYMENT_INSTRUCTIONS.format(
+        #    price=race.price,
+        #    phone=g.SBP_PHONE,
+        #    banks=g.SBP_BANKS,
+        #    cred=g.SBP_CRED,
+        # )
+
+        reply = "Вы зарегестрированы на гонку."
 
         await bot.send_message(
             callback_query.from_user.id,
             reply,
-            parse_mode="MarkdownV2",
+            # parse_mode="MarkdownV2",
         )
 
     else:
