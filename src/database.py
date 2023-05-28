@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import datetime
 from collections import namedtuple, defaultdict
 
 from mongoengine import (
@@ -285,9 +285,9 @@ def get_day(dt: str = None):
     Day = namedtuple("Day", ["begin", "now", "end"])
 
     if not dt:
-        dt = datetime.now() - timedelta(hours=g.HOUR_SHIFT)
+        dt = datetime.utcnow()
 
-        print("DT: ", dt)
+        logger.debug(f"Date is not specified, using current UTC time for now: {dt}.")
     else:
         dt = datetime.strptime(f"{dt} 00:00", "%d.%m.%Y %H:%M")
 
