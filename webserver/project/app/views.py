@@ -47,8 +47,7 @@ def telegram_login(request):
 
     if not mongo_user:
         logger.warning(f"User with telegram id {telegram_id} not found in database.")
-        # Todo: page with info about registration.
-        return Http404
+        return render(request, "needreg.html")
 
     logger.debug(
         f"Found user with telegram id {telegram_id} in database. "
