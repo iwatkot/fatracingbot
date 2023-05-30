@@ -1,5 +1,6 @@
 import os
 import sys
+import dropbox
 from pytz import timezone
 import logging
 from datetime import datetime, timedelta
@@ -12,20 +13,8 @@ LOG_FORMATTER = "%(name)s | %(asctime)s | %(levelname)s | %(message)s"
 LOG_DIR = os.path.join(WORKSPACE_PATH, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
-# Path to the static folder, maps should be placed here.
-# STATIC_DIR = os.path.join(WORKSPACE_PATH, "src", "static")
-# os.makedirs(STATIC_DIR, exist_ok=True)
-
 TRACKS_DIR = os.path.join(WORKSPACE_PATH, "tracks")
 os.makedirs(TRACKS_DIR, exist_ok=True)
-
-JSON_DIR = os.path.join(WORKSPACE_PATH, "json")
-os.makedirs(JSON_DIR, exist_ok=True)
-# JSON_RACE_INFO = os.path.join(JSON_DIR, "race_info.json")
-
-# GH_DIR = os.path.join(WORKSPACE_PATH, "gh")
-# os.makedirs(GH_DIR, exist_ok=True)
-# REPO_URL = "https://github.com/iwatkot/fatracks.git"
 
 # Chat IDs with volunteers and staff.
 TEAM_CHAT_ID = "-937192524"
@@ -131,3 +120,6 @@ AppState = State()
 SBP_PHONE = os.getenv("SBP_PHONE")
 SBP_BANKS = os.getenv("SBP_BANKS")
 SBP_CRED = os.getenv("SBP_CRED")
+
+# Dropbox API instance.
+DBX = dropbox.Dropbox(os.getenv("DROPBOX_KEY"))
