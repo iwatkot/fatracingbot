@@ -30,6 +30,8 @@ ALLOWED_HOSTS = [
     "fatracing.ru",
     "www.fatracing.ru",
     "iwatkot.online",
+    "bot",
+    "webserver",
 ]
 
 logger.info(f"Allowed hosts: {ALLOWED_HOSTS}")

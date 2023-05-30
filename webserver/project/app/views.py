@@ -88,7 +88,7 @@ def post_map(request):
         try:
             data = json.loads(request.body)
 
-            print(data)
+            logger.info(f"Received data: {data}")
 
             return HttpResponse("Success")
         except json.JSONDecodeError:

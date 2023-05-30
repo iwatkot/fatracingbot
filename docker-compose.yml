@@ -3,10 +3,18 @@ services:
   bot:
     build:
       context: ./bot
+    container_name: frb
     depends_on:
       - webserver
+    networks:
+      - fn
   webserver:
     build:
       context: ./webserver
+    container_name: frs
     ports:
       - 80:80
+    networks:
+      - fn
+networks:
+  fn:
