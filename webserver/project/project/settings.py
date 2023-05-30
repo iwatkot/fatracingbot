@@ -1,8 +1,6 @@
 import os
 import mongoengine
 
-from dotenv import load_dotenv
-
 import globals as g
 
 logger = g.Logger(__name__)
@@ -110,13 +108,4 @@ USE_TZ = False
 
 logger.info(f"Lanuage code: {LANGUAGE_CODE}, time zone: {TIME_ZONE}")
 
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
 STATIC_URL = "static/"
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
-
-# DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
