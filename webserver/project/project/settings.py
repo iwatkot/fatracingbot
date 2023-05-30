@@ -1,7 +1,9 @@
 import os
+
+import mongoengine
+
 from pathlib import Path
 from dotenv import load_dotenv
-
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,6 +21,7 @@ INSTALLED_APPS = [
     # * Third-party apps.
     "bootstrap4",
     "django_bootstrap_icons",
+    "mongoengine",
     # * Built-in apps.
     "django.contrib.admin",
     "django.contrib.auth",
@@ -59,38 +62,28 @@ TEMPLATES = [
 WSGI_APPLICATION = "project.wsgi.application"
 
 
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
+DEV_KEY = "dev.env"
+load_dotenv(DEV_KEY)
+HOST = os.getenv("HOST")
+PORT = int(os.getenv("PORT"))
+DB = os.getenv("DB")
+USERNAME = os.getenv("USERNAME")
+PASSWORD = os.getenv("PASSWORD")
+
+mongoengine.connect(
+    host=HOST,
+    port=PORT,
+    db=DB,
+    username=USERNAME,
+    password=PASSWORD,
+)
 
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": ":memory:",
     }
 }
-
-
-# Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
-    },
-    {
-        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
-    },
-]
-
-
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
 
 LANGUAGE_CODE = "en-us"
 

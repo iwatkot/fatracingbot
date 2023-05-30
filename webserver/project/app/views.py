@@ -4,10 +4,13 @@ import hashlib
 import hmac
 
 from django.shortcuts import render
+from django.contrib.auth import login as auth_login, authenticate
 from django.http import HttpResponse
 from django.views.decorators.csrf import csrf_exempt
 
 from dotenv import load_dotenv
+
+from .models import User
 
 CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -36,15 +39,20 @@ def login(request):
         [f"{key}={query[key]}" for key in sorted_keys if key != "hash"]
     )
 
-    print(data_check_string)
-
     secret_key = hashlib.sha256(AUTH_BOT_TOKEN.encode()).digest()
     signature = hmac.new(
         secret_key, data_check_string.encode(), hashlib.sha256
     ).hexdigest()
 
     if signature == received_hash:
-        print("Верификация успешна!")
+        print("Passed security check.")
+
+        telegram_id = query.get("id")
+        user = User.objects(telegram_id=telegram_id).first()
+
+        print("User first name:", user.first_name)
+
+        return HttpResponse("success")
     else:
         print("Верификация не удалась!")
 
