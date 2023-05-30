@@ -1,25 +1,22 @@
 import json
 import os
-import hashlib
-import hmac
+
 
 from django.shortcuts import render
-from django.contrib.auth import login as auth_login, authenticate
-from django.http import HttpResponse
+
+from django.contrib.auth import login as auth_login
+from django.contrib.auth.models import User
+from django.http import HttpResponse, Http404
 from django.views.decorators.csrf import csrf_exempt
 
-from dotenv import load_dotenv
+from .mongo import User as MongoUser
+from .utils import validate_login
+import globals as g
 
-from .models import User
+logger = g.Logger(__name__)
 
-CURRENT_PATH = os.path.dirname(os.path.abspath(__file__))
-
-DEV_FILE = os.path.join(CURRENT_PATH, "dev.env")
-
-load_dotenv(DEV_FILE)
-DATA_TELEGRAM_LOGIN = os.getenv("DATA_TELEGRAM_LOGIN")
-DATA_AUTH_URL = os.getenv("DATA_AUTH_URL")
-AUTH_BOT_TOKEN = os.getenv("AUTH_BOT_TOKEN")
+DATA_TELEGRAM_LOGIN = os.getenv("AUTH_BOT_USERNAME")
+DATA_AUTH_URL = os.getenv("AUTH_REDIRECT")
 
 
 def index(request):
@@ -30,35 +27,44 @@ def index(request):
     )
 
 
-def login(request):
+def telegram_login(request):
     query = request.GET
-    sorted_keys = sorted(query.keys())
-    received_hash = query["hash"]
 
-    data_check_string = "\n".join(
-        [f"{key}={query[key]}" for key in sorted_keys if key != "hash"]
+    if not validate_login(query):
+        return Http404
+
+    telegram_id = query.get("id")
+
+    logger.debug(f"Trying to log in with telegram id {telegram_id}.")
+
+    mongo_user = MongoUser.objects(telegram_id=telegram_id).first()
+
+    if not mongo_user:
+        logger.warning(f"User with telegram id {telegram_id} not found in database.")
+        # Todo: page with info about registration.
+        return Http404
+
+    logger.debug(
+        f"Found user with telegram id {telegram_id} in database. "
+        f"Full name: {mongo_user.first_name} {mongo_user.last_name}."
     )
 
-    secret_key = hashlib.sha256(AUTH_BOT_TOKEN.encode()).digest()
-    signature = hmac.new(
-        secret_key, data_check_string.encode(), hashlib.sha256
-    ).hexdigest()
+    try:
+        user = User.objects.get(username=mongo_user.telegram_id)
+    except User.DoesNotExist:
+        logger.debug(
+            f"User with telegram id {telegram_id} not found in Django database. It will be created."
+        )
+        user = User.objects.create(
+            username=mongo_user.telegram_id, password=mongo_user.telegram_id
+        )
 
-    if signature == received_hash:
-        print("Passed security check.")
+    auth_login(request, user)
 
-        telegram_id = query.get("id")
-        user = User.objects(telegram_id=telegram_id).first()
+    logger.debug(f"User with telegram id {telegram_id} logged in.")
 
-        print("User first name:", user.first_name)
-
-        return HttpResponse("success")
-    else:
-        print("Верификация не удалась!")
-
+    # Todo: redirect to success page and then to index.
     return HttpResponse("success")
-
-    # return render(request, "login.html")
 
 
 @csrf_exempt

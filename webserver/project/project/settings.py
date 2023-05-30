@@ -1,19 +1,40 @@
 import os
-
 import mongoengine
 
-from pathlib import Path
 from dotenv import load_dotenv
 
-# Build paths inside the project like this: BASE_DIR / 'subdir'.
-BASE_DIR = Path(__file__).resolve().parent.parent
+import globals as g
 
-KEY_FILE = "key.env"
-load_dotenv(KEY_FILE)
-SECRET_KEY = os.getenv("SECRET_KEY")
-DEBUG = True
+logger = g.Logger(__name__)
 
-ALLOWED_HOSTS = ["127.0.0.1", "localhost", "iwatkot.online"]
+BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+
+logger.info(f"Django starting with base dir: {BASE_DIR}")
+
+SECRET_KEY = os.getenv("DJANGO_KEY")
+
+if os.getenv("APP_MODE") == "prod":
+    DEBUG = False
+else:
+    DEBUG = True
+
+logger.info(f"Debug is set to: {DEBUG}")
+
+HOST = os.getenv("HOST")
+PORT = int(os.getenv("PORT"))
+DB = os.getenv("DB")
+USERNAME = os.getenv("USERNAME")
+PASSWORD = os.getenv("PASSWORD")
+
+ALLOWED_HOSTS = [
+    "127.0.0.1",
+    "localhost",
+    "fatracing.ru",
+    "www.fatracing.ru",
+    "iwatkot.online",
+]
+
+logger.info(f"Allowed hosts: {ALLOWED_HOSTS}")
 
 INSTALLED_APPS = [
     # * My apps.
@@ -62,15 +83,7 @@ TEMPLATES = [
 WSGI_APPLICATION = "project.wsgi.application"
 
 
-DEV_KEY = "dev.env"
-load_dotenv(DEV_KEY)
-HOST = os.getenv("HOST")
-PORT = int(os.getenv("PORT"))
-DB = os.getenv("DB")
-USERNAME = os.getenv("USERNAME")
-PASSWORD = os.getenv("PASSWORD")
-
-mongoengine.connect(
+con_info = mongoengine.connect(
     host=HOST,
     port=PORT,
     db=DB,
@@ -78,18 +91,24 @@ mongoengine.connect(
     password=PASSWORD,
 )
 
+logger.info(
+    f"Succesfully connected to following Mongo databases: {con_info.list_database_names()}"
+)
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": ":memory:",
+        "NAME": os.path.join(BASE_DIR, "db.sqlite3"),
     }
 }
 
-LANGUAGE_CODE = "en-us"
+LANGUAGE_CODE = "ru-ru"
 
 TIME_ZONE = "Europe/Moscow"
 USE_I18N = False
 USE_TZ = False
+
+logger.info(f"Lanuage code: {LANGUAGE_CODE}, time zone: {TIME_ZONE}")
 
 
 # Static files (CSS, JavaScript, Images)
