@@ -44,7 +44,7 @@ INSTALLED_APPS = [
     "django_bootstrap_icons",
     "mongoengine",
     # * Built-in apps.
-    "django.contrib.admin",
+    # "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",

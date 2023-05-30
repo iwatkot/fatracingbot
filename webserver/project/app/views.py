@@ -17,6 +17,7 @@ logger = g.Logger(__name__)
 
 DATA_TELEGRAM_LOGIN = os.getenv("AUTH_BOT_USERNAME")
 DATA_AUTH_URL = os.getenv("AUTH_REDIRECT")
+ADMINS = [int(admin) for admin in os.getenv("ADMINS").split(",")]
 
 
 def index(request):
@@ -55,9 +56,20 @@ def telegram_login(request):
         logger.debug(
             f"User with telegram id {telegram_id} not found in Django database. It will be created."
         )
-        user = User.objects.create(
-            username=mongo_user.telegram_id, password=mongo_user.telegram_id
-        )
+
+        if int(telegram_id) in ADMINS:
+            user = User.objects.create_superuser(
+                username=str(mongo_user.telegram_id),
+                password=str(mongo_user.telegram_id),
+            )
+
+            logger.info(f"User with telegram id {telegram_id} is superuser.")
+
+        else:
+            user = User.objects.create(
+                username=str(mongo_user.telegram_id),
+                password=str(mongo_user.telegram_id),
+            )
 
     auth_login(request, user)
 
