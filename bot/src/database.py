@@ -1,3 +1,9 @@
+import os
+import csv
+import tarfile
+import shutil
+
+from aiocron import crontab
 from datetime import datetime
 from collections import namedtuple, defaultdict
 
@@ -318,3 +324,56 @@ new_race = {
 }
 
 # Race(**new_race).save()
+
+
+@crontab("0 1 * * *")
+async def backup():
+    collection_names = sorted(
+        cinfo.get_database(g.AppState.DataBase.db).list_collection_names()
+    )
+    collections = [Payment, Race, User]
+
+    if not len(collection_names) == len(collections):
+        logger.error(
+            "Created collections and collection names are not equal, backup stopped."
+        )
+        return
+
+    logger.info(f"Starting backup for collections: {collection_names}.")
+
+    TMP_DIR = os.path.join(g.WORKSPACE_PATH, "tmp")
+    BACKUP_DIR = os.path.join(TMP_DIR, "backup")
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+
+    for cname, cclass in zip(collection_names, collections):
+        logger.debug(f"Downloading collection {cname}.")
+
+        collection_path = os.path.join(BACKUP_DIR, cname)
+        os.makedirs(collection_path, exist_ok=True)
+        for document in cclass.objects:
+            document_path = os.path.join(collection_path, f"{document.id}.csv")
+            document_json = dict(document.to_mongo())
+            with open(document_path, "w") as f:
+                writer = csv.DictWriter(f, document_json.keys())
+                writer.writeheader()
+                writer.writerow(document_json)
+
+    logger.debug("Downloaded all documents in CSV format.")
+
+    tar_path = os.path.join(TMP_DIR, "backup.tar")
+
+    with tarfile.open(tar_path, "w") as tar:
+        tar.add(BACKUP_DIR, arcname="backup")
+
+    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    logger.debug("Archived into tar, trying to upload to Dropbox.")
+
+    g.DBX.files_upload(
+        open(tar_path, "rb").read(),
+        f"/backup/backup_{timestamp}.tar",
+    )
+
+    shutil.rmtree(TMP_DIR)
+
+    logger.info("Backup finished, successfully uploaded to Dropbox, tmp dir removed.")

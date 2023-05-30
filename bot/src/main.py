@@ -1,5 +1,4 @@
 import asyncio
-import os
 import json
 import secrets
 
@@ -814,8 +813,6 @@ async def callback_race_end_init(callback_query):
             callback_query.from_user.id,
             Messages.ADMIN_RACE_END.value,
         )
-
-    await clean_up()
 
 
 @dp.callback_query_handler(text_contains="race_admin_info_")
