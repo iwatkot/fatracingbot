@@ -2,8 +2,8 @@ import json
 import os
 
 
-from django.shortcuts import render
-
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import user_passes_test
 from django.contrib.auth import login as auth_login
 from django.contrib.auth.models import User
 from django.http import HttpResponse, Http404
@@ -26,6 +26,11 @@ def index(request):
         "index.html",
         {"data_telegram_login": DATA_TELEGRAM_LOGIN, "data_auth_url": DATA_AUTH_URL},
     )
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def admin(request):
+    return render(request, "admin.html")
 
 
 def telegram_login(request):
@@ -75,8 +80,7 @@ def telegram_login(request):
 
     logger.debug(f"User with telegram id {telegram_id} logged in.")
 
-    # Todo: redirect to success page and then to index.
-    return HttpResponse("success")
+    return redirect("/")
 
 
 @csrf_exempt
