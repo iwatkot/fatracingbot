@@ -1,6 +1,6 @@
 import json
 import os
-
+import re
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import user_passes_test
@@ -157,10 +157,13 @@ def post(request):
 
         map_html = request.body.decode("utf-8")
 
+        map_html = map_html.split("<!DOCTYPE html>")[1]
+        html_content = map_html.split("</html>")[0]
+
         logger.debug("Trying to receive map from request body.")
 
         with open(MAP_PATH, "w") as f:
-            f.write(map_html)
+            f.write(html_content)
 
         logger.info(f"Received map and saved it to {MAP_PATH}.")
 
