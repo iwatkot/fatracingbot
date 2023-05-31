@@ -1,11 +1,10 @@
 import asyncio
-import json
 import secrets
 
 from datetime import datetime, timedelta
 from re import escape, match
 
-from aiogram import Bot, Dispatcher, executor
+from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher.filters import Text
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
@@ -454,68 +453,6 @@ async def button_upcoming_events(message):
 # region # * race
 
 
-# region # * location
-
-################################
-##### * Button handlers * ######
-################################
-
-
-@dp.message_handler(Text(equals=Buttons.BTN_TRANSLATION.value))
-async def button_translation(message):
-    await log_event(message)
-
-    race = await db.get_race_by_date()
-
-    if not race:
-        await bot.send_message(message.from_user.id, Messages.NO_RACE.value)
-        return
-
-    start_time = await add_hour_shift(race.start)
-    start_time = start_time.strftime("%H:%M")
-
-    reply = escape(
-        f"Сегодня проводится гонка  `{race.name}`\n\n"
-        f"Старт:  `{start_time}` \nДистанция:  `{race.distance} км`"
-    )
-
-    user = await db.get_user(message.from_user.id)
-    if not user:
-        await bot.send_message(message.from_user.id, Messages.ONLY_FOR_REGISTERED.value)
-        return
-
-    if user not in race.participants:
-        await bot.send_message(
-            message.from_user.id, Messages.ONLY_FOR_PARTICIPANTS.value
-        )
-        return
-
-    reply += Messages.TRANSLATION_REQUEST.escaped()
-    reply_markup = await keyboard({"location_translation": "Трансляция геолокации"})
-
-    await bot.send_message(
-        message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
-    )
-
-
-@dp.message_handler(Text(equals=Buttons.BTN_NEED_HELP.value))
-async def button_need_help(message):
-    await log_event(message)
-
-    coords = g.AppState.Race.location_data.get(message.from_user.id)
-
-    if not coords:
-        # TODO: ask for location with registered next handler
-        return
-
-    await bot.send_message(
-        message.from_user.id,
-        Messages.HELP_WITH_COORDS.value,
-    )
-
-    dp.register_message_handler(send_sos_message)
-
-
 ################################
 #### * Callback handlers * #####
 ################################
@@ -631,6 +568,186 @@ async def callback_race_register(callback_query):
 
     else:
         await bot.send_message(callback_query.from_user.id, "Что-то пошло не так...")
+
+
+# endregion
+
+
+# region # * location
+
+################################
+##### * Button handlers * ######
+################################
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_TRANSLATION.value))
+async def button_translation(message):
+    await log_event(message)
+
+    race = await db.get_race_by_date()
+
+    if not race:
+        await bot.send_message(message.from_user.id, Messages.NO_RACE.value)
+        return
+
+    start_time = await add_hour_shift(race.start)
+    start_time = start_time.strftime("%H:%M")
+
+    reply = escape(
+        f"Сегодня проводится гонка  `{race.name}`\n\n"
+        f"Старт:  `{start_time}` \nДистанция:  `{race.distance} км`"
+    )
+
+    user = await db.get_user(message.from_user.id)
+    if not user:
+        await bot.send_message(message.from_user.id, Messages.ONLY_FOR_REGISTERED.value)
+        return
+
+    if user not in race.participants:
+        await bot.send_message(
+            message.from_user.id, Messages.ONLY_FOR_PARTICIPANTS.value
+        )
+        return
+
+    reply += Messages.TRANSLATION_REQUEST.escaped()
+    reply_markup = await keyboard({"location_translation": "Трансляция геолокации"})
+
+    await bot.send_message(
+        message.from_user.id, reply, parse_mode="MarkdownV2", reply_markup=reply_markup
+    )
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_NEED_HELP.value))
+async def button_need_help(message):
+    await log_event(message)
+
+    coords = g.AppState.Race.location_data.get(message.from_user.id)
+
+    if not coords:
+        # TODO: ask for location with registered next handler
+        return
+
+    await bot.send_message(
+        message.from_user.id,
+        Messages.HELP_WITH_COORDS.value,
+    )
+
+    dp.register_message_handler(send_sos_message)
+
+
+################################
+#### * Location handlers * ####
+################################
+
+
+@dp.message_handler(content_types=types.ContentType.LOCATION)
+async def translation_started(message):
+    if message.location.live_period:
+        logger.info(f"User {message.from_user.id} started live location translation.")
+
+        await bot.send_message(
+            chat_id=message.from_user.id,
+            text=Messages.TRANSLATION_LIVE.escaped(),
+            parse_mode="MarkdownV2",
+        )
+    else:
+        logger.warning(f"User {message.from_user.id} sent NOT live location.")
+
+        await bot.send_message(
+            chat_id=message.from_user.id,
+            text=Messages.TRANSLATION_NOT_LIVE.escaped(),
+            parse_mode="MarkdownV2",
+        )
+
+
+@dp.edited_message_handler(content_types=types.ContentType.LOCATION)
+async def translation(message):
+    if not message.location.live_period:
+        return
+
+    coordinates = [message.location.latitude, message.location.longitude]
+
+    logger.debug(
+        f"Received live coordinates from telegram id {message.from_user.id}: {coordinates}."
+    )
+
+    race = g.AppState.Race.info
+
+    if not race:
+        logger.debug(
+            "Live coordinates received, but there's no active race at the moment."
+        )
+        return
+
+    if not g.AppState.Race.location_data.get(message.from_user.id):
+        logger.debug(
+            f"User {message.from_user.id} is not in location_data, will create it."
+        )
+
+        user = await db.get_user(message.from_user.id)
+        if not user:
+            logger.warning(
+                f"Can't find the user with telegram id {message.from_user.id} in database."
+            )
+            return
+
+        try:
+            category, race_number = await db.get_participant_info(
+                race, message.from_user.id
+            )
+        except Exception:
+            logger.warning(
+                f"Can't find the user {user.first_name} {user.last_name} in participants list."
+            )
+            return
+
+        if await is_finished(race_number):
+            logger.debug(
+                f"User {message.from_user.id} already finished, will not save coordinates."
+            )
+            return
+
+        user_info = {
+            "full_name": f"{user.last_name} {user.first_name}",
+            "category": category,
+            "race_number": race_number,
+            "coordinates": coordinates,
+        }
+
+        g.AppState.Race.location_data[message.from_user.id] = user_info
+
+        logger.debug(f"User info saved in global state: {user_info}.")
+    else:
+        user_info = g.AppState.Race.location_data[message.from_user.id]
+        race_number = user_info["race_number"]
+
+        if await is_finished(race_number):
+            logger.debug(
+                f"User {message.from_user.id} already finished, will not save coordinates."
+            )
+            return
+
+        logger.debug(
+            f"User {message.from_user.id} is in location_data, will update coordinates."
+        )
+
+        g.AppState.Race.location_data[message.from_user.id]["coordinates"] = coordinates
+
+
+################################
+##### * Callback handlers * ####
+################################
+
+
+@dp.callback_query_handler(text_contains="location_translation")
+async def callback_location_translation(callback_query):
+    await log_event(callback_query)
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        Messages.TRANSLATION_TOOLTIP.escaped(),
+        parse_mode="MarkdownV2",
+    )
 
 
 ################################
@@ -775,18 +892,6 @@ async def callback_race_start_init(callback_query):
 
     logger.info(f"Race with name {race.name} started at epoch time: {start_time}.")
 
-    json_race_info = {
-        "name": race.name,
-        "code": race.code,
-        "ongoing": True,
-        "start_time": start_time,
-    }
-
-    with open(g.JSON_RACE_INFO, "w") as f:
-        json.dump(json_race_info, f)
-
-    logger.info(f"JSON race info is saved in {g.JSON_RACE_INFO}.")
-
     await bot.send_message(
         callback_query.from_user.id, Messages.ADMIN_RACE_STARTED.value
     )
@@ -813,6 +918,8 @@ async def callback_race_end_init(callback_query):
             callback_query.from_user.id,
             Messages.ADMIN_RACE_END.value,
         )
+
+        tr.make_post("race_stop")
 
 
 @dp.callback_query_handler(text_contains="race_admin_info_")

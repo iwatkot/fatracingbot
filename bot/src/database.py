@@ -307,7 +307,7 @@ def get_day(dt: str = None):
 
 name = "FATRACING RAZDELKA CUP"
 categories = ["М: ШОССЕ", "М: ЦК", "М: ФИКС СИНГЛ", "Ж: ЖЕНЩИНЫ"]
-start = datetime.strptime("28.05.2023 08:00", "%d.%m.%Y %H:%M")
+start = datetime.strptime("31.05.2023 20:50", "%d.%m.%Y %H:%M")
 location = [58.46819985377836, 31.25682260802916]
 code = "RAZDELKA"
 distance = 20

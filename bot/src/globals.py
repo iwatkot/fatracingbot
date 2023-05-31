@@ -16,6 +16,10 @@ os.makedirs(LOG_DIR, exist_ok=True)
 TRACKS_DIR = os.path.join(WORKSPACE_PATH, "tracks")
 os.makedirs(TRACKS_DIR, exist_ok=True)
 
+MAP_DIR = os.path.join(WORKSPACE_PATH, "map")
+os.makedirs(MAP_DIR, exist_ok=True)
+MAP_PATH = os.path.join(MAP_DIR, "map.html")
+
 # Chat IDs with volunteers and staff.
 TEAM_CHAT_ID = "-937192524"
 

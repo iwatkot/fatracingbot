@@ -1,17 +1,19 @@
 import os
+import requests
+
 import gpxpy
 import dropbox
 import folium
 import json
 from geopy.distance import geodesic
 from aiocron import crontab
-
-# from git import Repo
 import numpy as np
 
 import globals as g
 
 logger = g.Logger(__name__)
+
+POST_TOKEN = os.getenv("POST_TOKEN")
 
 
 async def download_gpx():
@@ -165,12 +167,10 @@ async def race_map_create():
             f"Added {user_info['full_name']} to leaderboard with distance {distance}."
         )
 
-    map_save_path = os.path.join(g.STATIC_DIR, f"{race_code}_map.html")
-
-    m.save(map_save_path)
+    m.save(g.MAP_PATH)
 
     logger.debug(
-        f"Map created, added {len(g.AppState.Race.location_data)} markers. Saved to {map_save_path}."
+        f"Map created, added {len(g.AppState.Race.location_data)} markers. Saved to {g.MAP_PATH}."
     )
 
     await build_leaderboard(raw_leaderboard)
@@ -198,10 +198,50 @@ async def build_leaderboard(raw_leaderboard):
 
     logger.debug(f"Built leaderboard with {len(leaderboard)} entries.")
 
-    race_code = g.AppState.Race.info.code
-    json_path = os.path.join(g.JSON_DIR, f"{race_code}_leaderboard_all.json")
+    make_post("leaderboard", json=leaderboard)
+    make_post("map")
 
-    with open(json_path, "w") as json_file:
-        json.dump(leaderboard, json_file, indent=2)
 
-    logger.info(f"Leaderboard saved to {json_path}.")
+def make_post(request_type, json=None):
+    url = "http://127.0.0.1/post/"
+
+    logger.debug(f"Sending POST request with {request_type} to {url}.")
+
+    headers = {
+        "Content-Type": "application/json",
+        "post-token": POST_TOKEN,
+        "request-type": request_type,
+    }
+    if json:
+        try:
+            response = requests.post(url, headers=headers, json=json)
+            logger.info(f"POST request with JSON sent with response: {response.text}")
+        except Exception:
+            logger.error("Error while sending POST request with JSON.")
+        return
+
+    elif request_type == "race_stop":
+        try:
+            response = requests.post(url, headers=headers)
+        except Exception:
+            logger.error("Error while sending POST request with race stop.")
+        return
+
+    else:
+        map_file = open(g.MAP_PATH, "rb")
+        files = {"map": map_file}
+        try:
+            response = requests.post(url, headers=headers, files=files)
+            logger.info(f"POST request with map sent with response: {response.text}")
+        except Exception:
+            logger.error("Error while sending POST request with map.")
+        return
+
+
+test_data = ["name", "distance", "race_number", "category", "row_number"]
+
+# while True:
+#    make_post("leaderboard", test_data)
+#    time.sleep(10)
+
+# make_post("map")
