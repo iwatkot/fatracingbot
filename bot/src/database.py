@@ -3,7 +3,6 @@ import csv
 import tarfile
 import shutil
 
-from aiocron import crontab
 from datetime import datetime
 from collections import namedtuple, defaultdict
 
@@ -305,13 +304,22 @@ def get_day(dt: str = None):
     return day
 
 
-name = "FATRACING RAZDELKA CUP"
-categories = ["М: ШОССЕ", "М: ЦК", "М: ФИКС СИНГЛ", "Ж: ЖЕНЩИНЫ"]
-start = datetime.strptime("31.05.2023 20:50", "%d.%m.%Y %H:%M")
-location = [58.46819985377836, 31.25682260802916]
-code = "RAZDELKA"
-distance = 20
-price = 100
+name = "Тур де Селищи"
+categories = [
+    "М: ШОССЕ",
+    "Ж: ШОССЕ",
+    "М: ЦК",
+    "Ж: ЦК",
+    "М: ФИКС СИНГЛ",
+    "Ж: ФИКС СИНГЛ",
+    "М: МТБ",
+    "Ж: МТБ",
+]
+start = datetime.strptime("03.06.2023 09:00", "%d.%m.%Y %H:%M")
+location = [58.64975393131507, 31.458961915652303]
+code = "TDS"
+distance = 125
+price = 1000
 
 new_race = {
     "name": name,
@@ -326,7 +334,7 @@ new_race = {
 # Race(**new_race).save()
 
 
-@crontab("0 1 * * *")
+# @crontab("0 1 * * *")
 async def backup():
     collection_names = sorted(
         cinfo.get_database(g.AppState.DataBase.db).list_collection_names()
@@ -365,15 +373,8 @@ async def backup():
     with tarfile.open(tar_path, "w") as tar:
         tar.add(BACKUP_DIR, arcname="backup")
 
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    logger.debug("Archived into tar, trying to upload to Dropbox.")
-
-    g.DBX.files_upload(
-        open(tar_path, "rb").read(),
-        f"/backup/backup_{timestamp}.tar",
-    )
+    # TODO: somehow handle the backup file
 
     shutil.rmtree(TMP_DIR)
-
-    logger.info("Backup finished, successfully uploaded to Dropbox, tmp dir removed.")

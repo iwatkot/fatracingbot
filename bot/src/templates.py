@@ -155,7 +155,7 @@ class Buttons(Enum):
     BTN_MANAGE_EVENTS = "Управление мероприятиями"
 
     # * Main menus.
-    MN_MAIN_USER = [BTN_ACCOUNT, BTN_DURING_RACE, BTN_EVENTS, BTN_INFO, BTN_ADMIN]
+    MN_MAIN_USER = [BTN_ACCOUNT, BTN_DURING_RACE, BTN_EVENTS, BTN_INFO]
     MN_MAIN_ADMIN = [
         BTN_ACCOUNT,
         BTN_DURING_RACE,

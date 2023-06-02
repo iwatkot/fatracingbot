@@ -1,10 +1,13 @@
 import os
 import sys
-import dropbox
-from pytz import timezone
 import logging
+
+from pytz import timezone
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
+
+from googleapiclient.discovery import build
+from google.oauth2 import service_account
 
 CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
 WORKSPACE_PATH = os.path.dirname(CURRENT_PATH)
@@ -12,6 +15,9 @@ WORKSPACE_PATH = os.path.dirname(CURRENT_PATH)
 LOG_FORMATTER = "%(name)s | %(asctime)s | %(levelname)s | %(message)s"
 LOG_DIR = os.path.join(WORKSPACE_PATH, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
+
+GH_DIR = os.path.join(WORKSPACE_PATH, "tracks_repo")
+os.makedirs(GH_DIR, exist_ok=True)
 
 TRACKS_DIR = os.path.join(WORKSPACE_PATH, "tracks")
 os.makedirs(TRACKS_DIR, exist_ok=True)
@@ -124,6 +130,3 @@ AppState = State()
 SBP_PHONE = os.getenv("SBP_PHONE")
 SBP_BANKS = os.getenv("SBP_BANKS")
 SBP_CRED = os.getenv("SBP_CRED")
-
-# Dropbox API instance.
-DBX = dropbox.Dropbox(os.getenv("DROPBOX_KEY"))

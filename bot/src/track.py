@@ -1,13 +1,14 @@
 import os
 import requests
+import json
 
 import gpxpy
-import dropbox
 import folium
-import json
-from geopy.distance import geodesic
-from aiocron import crontab
 import numpy as np
+
+from aiocron import crontab
+from geopy.distance import geodesic
+from git import Repo
 
 import globals as g
 
@@ -17,21 +18,19 @@ POST_TOKEN = os.getenv("POST_TOKEN")
 
 
 async def download_gpx():
-    logger.info("Trying to download GPX files from Dropbox dir '/tracks'.")
-    files = g.DBX.files_list_folder("/tracks").entries
+    repo_url = "https://github.com/iwatkot/fatracks.git"
+    logger.info(f"Trying to download files from github repo {repo_url}.")
 
-    logger.info(f"Found {len(files)} files in '/tracks'")
+    try:
+        Repo.clone_from(repo_url, g.GH_DIR)
+        logger.info("GH directory cloned.")
+    except Exception:
+        repo = Repo(g.GH_DIR)
+        repo.remotes.origin.pull()
+        logger.info("GH directory wasn't empty, pulled changes.")
 
-    for entry in files:
-        if isinstance(entry, dropbox.files.FileMetadata):
-            g.DBX.files_download_to_file(
-                os.path.join(g.TRACKS_DIR, entry.name), f"/tracks/{entry.name}"
-            )
-
-    gpx_files = [file for file in os.listdir(g.TRACKS_DIR) if file.endswith(".gpx")]
-
-    logger.info(f"Succesfully downloaded {len(gpx_files)} GPX files: {gpx_files}")
-
+    gpx_files = [file for file in os.listdir(g.GH_DIR) if file.endswith(".gpx")]
+    logger.info(f"GH directory contains following GPX files: {gpx_files}")
     return gpx_files
 
 
@@ -54,7 +53,7 @@ async def prepare_json_tracks():
 async def gpx_to_json(race_code) -> str | None:
     gpx_file_name = f"{race_code}.gpx"
     json_file_name = f"{race_code}.json"
-    gpx_file_path = os.path.join(g.TRACKS_DIR, gpx_file_name)
+    gpx_file_path = os.path.join(g.GH_DIR, gpx_file_name)
     json_file_path = os.path.join(g.TRACKS_DIR, json_file_name)
 
     if not os.path.exists(gpx_file_path):
@@ -78,11 +77,6 @@ async def gpx_to_json(race_code) -> str | None:
         json.dump(track_points, json_file, indent=2)
 
     logger.info(f"Track points saved to {json_file_name}.")
-
-    try:
-        os.remove(gpx_file_path)
-    except Exception:
-        pass
 
     return json_file_path
 
