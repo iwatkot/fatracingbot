@@ -1,6 +1,7 @@
 import os
 import requests
 import json
+import shutil
 
 import gpxpy
 import folium
@@ -18,6 +19,8 @@ POST_TOKEN = os.getenv("POST_TOKEN")
 
 
 async def download_gpx():
+    shutil.rmtree(g.GH_DIR)
+
     repo_url = "https://github.com/iwatkot/fatracks.git"
     logger.info(f"Trying to download files from github repo {repo_url}.")
 
