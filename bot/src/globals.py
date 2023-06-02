@@ -6,8 +6,6 @@ from pytz import timezone
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
-from googleapiclient.discovery import build
-from google.oauth2 import service_account
 
 CURRENT_PATH = os.path.dirname(os.path.realpath(__file__))
 WORKSPACE_PATH = os.path.dirname(CURRENT_PATH)
