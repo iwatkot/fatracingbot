@@ -695,6 +695,11 @@ async def translation(message):
             category, race_number = await db.get_participant_info(
                 race, message.from_user.id
             )
+            logger.debug(
+                f"Found category {category} and race number {race_number} for user with "
+                f"telegram id {message.from_user.id}."
+            )
+
         except Exception:
             logger.warning(
                 f"Can't find the user {user.first_name} {user.last_name} in participants list."

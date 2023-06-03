@@ -165,7 +165,7 @@ async def new_user(**kwargs):
 async def get_upcoming_races():
     day = get_day()
 
-    logger.debug(f"Trying to get list of upcoming races after {day.now}.")
+    logger.debug(f"Trying to get list of upcoming races after {day.begin}.")
 
     races = Race.objects(start__gte=day.now).order_by("start")
 
@@ -215,6 +215,7 @@ async def register_to_race(telegram_id, race_name, category):
     participant_info = {
         "telegram_id": telegram_id,
         "category": category,
+        "race_number": 0,
     }
 
     logger.debug(f"Prepared participant info: {participant_info}.")
@@ -315,7 +316,7 @@ categories = [
     "М: МТБ",
     "Ж: МТБ",
 ]
-start = datetime.strptime("03.06.2023 09:00", "%d.%m.%Y %H:%M")
+start = datetime.strptime("03.06.2023 20:00", "%d.%m.%Y %H:%M")
 location = [58.64975393131507, 31.458961915652303]
 code = "TDS"
 distance = 125
@@ -331,7 +332,7 @@ new_race = {
     "price": price,
 }
 
-# Race(**new_race).save()
+Race(**new_race).save()
 
 
 # @crontab("0 1 * * *")
