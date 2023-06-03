@@ -193,7 +193,11 @@ async def build_leaderboard(raw_leaderboard):
             }
         )
 
-    logger.debug(f"Built leaderboard with {len(leaderboard)} entries.")
+    g.AppState.Race.leaderboard = leaderboard
+
+    logger.debug(
+        f"Built leaderboard with {len(leaderboard)} entries and saved it in global state."
+    )
 
     make_post("leaderboard", json=leaderboard)
     make_post("map")

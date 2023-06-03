@@ -410,6 +410,11 @@ async def edit_user(message):
 # region # * events
 
 
+################################
+##### * Button handlers * ######
+################################
+
+
 @dp.message_handler(
     Text(equals=[Buttons.UPCOMING_EVENTS.value, Buttons.ADMIN_UPCOMING_EVENTS.value])
 )
@@ -451,6 +456,73 @@ async def button_upcoming_events(message):
 
 
 # region # * race
+
+
+################################
+##### * Button handlers * ######
+################################
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_LEADERBOARD.value))
+async def button_leaderboard(message):
+    await log_event(message)
+
+    if not g.AppState.Race.ongoing:
+        await bot.send_message(
+            message.from_user.id, "В данный момент нет активных гонок."
+        )
+        return
+
+    try:
+        leaders = g.AppState.Race.leaderboard[:10]
+    except Exception:
+        await bot.send_message(
+            message.from_user.id, "Недостаточно данных, попробуйте позже."
+        )
+        return
+
+    reply = "Лидеры:\n\n"
+    for leader in leaders:
+        reply += (
+            f'{leader["row_number"]}. {leader["full_name"]} - {leader["distance"]} км\n'
+        )
+
+    await bot.send_message(message.from_user.id, reply)
+
+
+@dp.message_handler(Text(equals=Buttons.BTN_YOUR_STATUS.value))
+async def button_your_status(message):
+    await log_event(message)
+
+    if not g.AppState.Race.ongoing:
+        await bot.send_message(
+            message.from_user.id, "В данный момент нет активных гонок."
+        )
+        return
+
+    race = g.AppState.Race.info
+
+    try:
+        category, race_number = db.get_participant_info(race, message.from_user.id)
+    except Exception:
+        await bot.send_message(
+            message.from_user.id, "Бот не смог найти вас среди участников гонки."
+        )
+        return
+
+    leaders = g.AppState.Race.leaderboard
+
+    for leader in leaders:
+        if leader["race_number"] == race_number:
+            position = leader["row_number"]
+            break
+
+    if position:
+        reply = f"Ваша абсолютная позиция в гонке: {position}"
+    else:
+        reply = "Ваша позиция в гонке: не определена"
+
+    await bot.send_message(message.from_user.id, reply)
 
 
 ################################
@@ -822,10 +894,13 @@ async def button_manage_race(message):
     )
 
     buttons = {
-        f"race_start_init_{race.name}": "Гонка началась",
+        f"race_start_init_{race.name}": "Запустить гонку",
         f"race_timekeeping_init_{race.name}": "Фиксация результатов",
-        f"race_end_init_{race.name}": "Гонка завершена",
+        f"race_end_init_{race.name}": "Остановить гонку",
     }
+
+    if g.AppState.Race.ongoing:
+        buttons[f"race_start_init_{race.name}"] = "Гонка уже запущена"
 
     reply_markup = await keyboard(buttons)
 

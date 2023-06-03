@@ -332,7 +332,7 @@ new_race = {
     "price": price,
 }
 
-Race(**new_race).save()
+# Race(**new_race).save()
 
 
 # @crontab("0 1 * * *")
