@@ -1,9 +1,6 @@
 from django.urls import path
 
-# from django.contrib.auth import views as auth_views
 from . import views
-from django.conf import settings
-from django.conf.urls.static import static
 
 app_name = "app"
 urlpatterns = [
@@ -16,6 +13,3 @@ urlpatterns = [
     path("logout/", views.logout, name="logout"),
     path("admin/", views.admin, name="admin"),
 ]
-
-if settings.DEBUG:
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
