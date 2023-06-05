@@ -116,7 +116,7 @@ class Messages(Enum):
 class Buttons(Enum):
     # * Context buttons.
     BTN_CANCEL = "Отмена"
-    BTN_COMPLETE = "Завершить"  # TODO: This button is for race results on finish.
+    BTN_COMPLETE = "Завершить"
     BTN_SKIP = "Пропустить"
     BTN_CONFIRM = "Подтвердить"
     BTN_GENDER_M = "Мужской"
@@ -191,6 +191,3 @@ class Buttons(Enum):
     # * Admin menu.
     MN_ADMIN = [BTN_MANAGE_RACE, BTN_MANAGE_PAYMENTS, BTN_MANAGE_EVENTS, BTN_MAIN]
     MN_ADMIN_EVENTS = [ADMIN_UPCOMING_EVENTS, BTN_MAIN]
-
-    # ? Not implemented list of buttons.
-    NOT_IMPLEMENTED = [BTN_ACCOUNT_RESULTS, BTN_LEADERBOARD, BTN_YOUR_STATUS, BTN_INFO]

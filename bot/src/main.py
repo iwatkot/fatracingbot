@@ -128,6 +128,16 @@ async def button_admin(message):
 ################################
 
 
+@dp.message_handler(Text(equals=Buttons.BTN_ACCOUNT_RESULTS.value))
+async def button_account_results(message):
+    await log_event(message)
+
+    await bot.send_message(
+        message.from_user.id,
+        "Функция в разработке",
+    )
+
+
 @dp.message_handler(Text(equals=Buttons.BTN_ACCOUNT_NEW.value))
 async def button_account_new(message):
     await log_event(message)
@@ -232,6 +242,8 @@ async def callback_user_edit(callback_query):
     g.AppState.user_edit_field = field
     dp.register_message_handler(edit_user)
 
+    logger.debug(f"Registered next handler for message: {edit_user.__name__}")
+
     await bot.send_message(
         callback_query.from_user.id,
         reply,
@@ -248,6 +260,8 @@ async def callback_user_edit(callback_query):
 async def register(message):
     await log_event(message)
 
+    logger.debug(f"Triggered handler: {register.__name__}")
+
     user = g.AppState.user_data.get(message.from_user.id)
 
     if message.text == Buttons.BTN_CANCEL.value:
@@ -263,8 +277,10 @@ async def register(message):
     if not user:
         reply_markup = await keyboard([Buttons.BTN_CANCEL.value])
 
-        if message.text.isalpha():
-            g.AppState.user_data[message.from_user.id] = {"first_name": message.text}
+        if is_name(message.text):
+            g.AppState.user_data[message.from_user.id] = {
+                "first_name": message.text.capitalize()
+            }
             reply = Messages.REG_LAST_NAME.escaped()
         else:
             reply = Messages.WRONG_NAME.escaped()
@@ -276,6 +292,13 @@ async def register(message):
 
             await bot.send_message(message.from_user.id, Messages.REG_SUCCESS.value)
             await button_account(message)
+
+            dp.message_handlers.unregister(register)
+
+            logger.debug(
+                f"User pressed confirm button, registration completed. "
+                f"Unregistered handler: {register.__name__}"
+            )
 
             return
 
@@ -328,8 +351,8 @@ async def register(message):
             reply_markup = await keyboard([Buttons.BTN_CANCEL.value])
             user["gender"] = message.text
     elif "first_name" in user:
-        if message.text.isalpha():
-            user["last_name"] = message.text
+        if is_name(message.text):
+            user["last_name"] = message.text.capitalize()
             reply = Messages.REG_GENDER.escaped()
             reply_markup = await keyboard(Buttons.MN_REG_GENDER.value)
         else:
@@ -344,6 +367,8 @@ async def register(message):
 async def edit_user(message):
     await log_event(message)
 
+    logger.debug(f"Triggered handler: {register.__name__}")
+
     if message.text == Buttons.BTN_CANCEL.value:
         dp.message_handlers.unregister(edit_user)
 
@@ -356,15 +381,15 @@ async def edit_user(message):
     field = g.AppState.user_edit_field
 
     if field == "first_name":
-        if message.text.isalpha():
+        if is_name(message.text):
             unregister_handler = True
-            value = message.text
+            value = message.text.capitalize()
         else:
             reply = Messages.WRONG_NAME.escaped()
     elif field == "last_name":
-        if message.text.isalpha():
+        if is_name(message.text):
             unregister_handler = True
-            value = message.text
+            value = message.text.capitalize()
         else:
             reply = Messages.WRONG_NAME.escaped()
     elif field == "gender":
@@ -1186,6 +1211,15 @@ async def is_email(email: str):
     pattern = r"^[\w\.-]+@[\w\.-]+\.\w+$"
     res = match(pattern, email)
     return res is not None
+
+
+def is_name(name: str):
+    allowed_characters = set("абвгдеёжзийклмнопрстуфхцчшщъыьэюя- ")
+
+    for char in name:
+        if char.isdigit() or char.lower() not in allowed_characters:
+            return False
+    return True
 
 
 async def keyboard(buttons: list | dict):
