@@ -3,12 +3,8 @@
 logs/
 __pycache__/
 .flake8
-*.html
 .DS_Store
 tmp/
 maps/
-src/static/
-gh/
 tracks/
-json/
 tracks_repo

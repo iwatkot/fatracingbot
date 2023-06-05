@@ -221,11 +221,11 @@ def make_post(request_type, json=None):
             logger.error("Error while sending POST request with JSON.")
         return
 
-    elif request_type == "race_stop":
+    elif request_type == "race_state":
         try:
-            response = requests.post(url, headers=headers)
+            response = requests.post(url, headers=headers, json=json)
         except Exception:
-            logger.error("Error while sending POST request with race stop.")
+            logger.error("Error while sending POST request with race state.")
         return
 
     else:

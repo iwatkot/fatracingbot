@@ -121,6 +121,9 @@ async def get_user(telegram_id):
 
 async def get_participant_info(race, telegram_id):
     for participant_info in race.participants_infos:
+        print(type(telegram_id), telegram_id)
+        print(type(participant_info["telegram_id"]), participant_info["telegram_id"])
+
         if participant_info["telegram_id"] == telegram_id:
             return participant_info["category"], participant_info["race_number"]
 
@@ -131,10 +134,6 @@ async def get_participant_by_race_number(race, race_number):
     ):
         if int(participant_info["race_number"]) == race_number:
             return participant, participant_info["category"]
-
-
-async def get_user_by_fatracing_id(fatracing_id):
-    return User.objects(fatracing_id=fatracing_id).first()
 
 
 async def update_user(telegram_id, **kwargs):
@@ -316,7 +315,7 @@ categories = [
     "М: МТБ",
     "Ж: МТБ",
 ]
-start = datetime.strptime("03.06.2023 20:00", "%d.%m.%Y %H:%M")
+start = datetime.strptime("05.06.2023 20:00", "%d.%m.%Y %H:%M")
 location = [58.64975393131507, 31.458961915652303]
 code = "TDS"
 distance = 125

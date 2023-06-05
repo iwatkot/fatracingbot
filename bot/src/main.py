@@ -997,6 +997,8 @@ async def callback_race_start_init(callback_query):
 
     logger.info(f"Race with name {race.name} started at epoch time: {start_time}.")
 
+    tr.make_post("race_state", "start")
+
     await bot.send_message(
         callback_query.from_user.id, Messages.ADMIN_RACE_STARTED.value
     )
@@ -1024,7 +1026,7 @@ async def callback_race_end_init(callback_query):
             Messages.ADMIN_RACE_END.value,
         )
 
-        tr.make_post("race_stop")
+        tr.make_post("race_state", "stop")
 
 
 @dp.callback_query_handler(text_contains="race_admin_info_")
