@@ -2,17 +2,12 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "FATRACING",
+            "name": "FATRACING Webserver",
             "type": "python",
             "request": "launch",
-            "module": "gunicorn",
-            "args": [
-                "project.wsgi:application",
-                "-c",
-                "${workspaceFolder}/gunicorn_config.py",
-            ],
-            "console": "integratedTerminal",
             "cwd": "${workspaceFolder}/project",
+            "program": "${workspaceFolder}/project/server.py",
+            "console": "integratedTerminal",
             "python": "${workspaceFolder}/.venv/bin/python"
         }
     ]

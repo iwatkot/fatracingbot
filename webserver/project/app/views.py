@@ -1,6 +1,5 @@
 import json
 import os
-import re
 
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import user_passes_test
@@ -21,7 +20,15 @@ DATA_AUTH_URL = os.getenv("AUTH_REDIRECT")
 POST_TOKEN = os.getenv("POST_TOKEN")
 ADMINS = [int(admin) for admin in os.getenv("ADMINS").split(",")]
 MAP_PATH = os.path.join(settings.STATIC_ROOT, "map.html")
-LEADERBOARD_PATH = os.path.join(settings.STATIC_ROOT, "leaderboard.json")
+
+
+class AppState:
+    def __init__(self):
+        self.race_is_live = False
+        self.leaderboard = []
+
+
+APP_STATE = AppState()
 
 
 def index(request):
@@ -124,41 +131,46 @@ def post(request):
     if request_type == "leaderboard":
         leaderboard = json.loads(request.body)
 
-        with open(LEADERBOARD_PATH, "w") as f:
-            json.dump(leaderboard, f)
+        APP_STATE.leaderboard = leaderboard
 
-        logger.info(
-            f"Received leaderboard with {len(leaderboard)} entries and saved it to {LEADERBOARD_PATH}."
-        )
+        logger.info(f"Received leaderboard: {leaderboard} and saved it in app state.")
 
         return HttpResponse("Success")
 
-    elif request_type == "race_stop":
-        logger.info("Received request to stop the race, will delete files.")
+    elif request_type == "race_state":
+        race_state = json.loads(request.body)
+        logger.info(f"Received request to change race_state to: {race_state}.")
 
-        try:
-            os.remove(MAP_PATH)
-            logger.debug(f"Removed map from {MAP_PATH}.")
-        except FileNotFoundError:
-            logger.debug(f"Map not found at {MAP_PATH}.")
-            pass
+        if race_state == "start":
+            APP_STATE.race_is_live = True
 
-        try:
-            os.remove(LEADERBOARD_PATH)
-            logger.debug(f"Removed leaderboard from {LEADERBOARD_PATH}.")
-        except FileNotFoundError:
-            logger.debug(f"Leaderboard not found at {LEADERBOARD_PATH}.")
-            pass
+        elif race_state == "stop":
+            APP_STATE.race_is_live = False
+            try:
+                os.remove(MAP_PATH)
+                logger.debug(f"Removed map from {MAP_PATH}.")
+            except FileNotFoundError:
+                logger.debug(f"Map not found at {MAP_PATH}.")
+                pass
+
+        logger.debug(f"Race state is now: {APP_STATE.race_is_live}.")
 
         return HttpResponse("Success")
 
     elif request_type == "map":
         logger.debug("Received map request.")
-
         map_html = request.body.decode("utf-8")
 
-        map_html = map_html.split("<!DOCTYPE html>")[1]
-        html_content = map_html.split("</html>")[0]
+        start_substring = "<!DOCTYPE html>"
+        end_substring = "</html>"
+
+        start_index = map_html.find(start_substring)
+        end_index = map_html.find(end_substring)
+
+        if start_index == -1:
+            start_index = 0
+
+        html_content = map_html[start_index : end_index + len(end_substring)]
 
         logger.debug("Trying to receive map from request body.")
 
@@ -173,13 +185,10 @@ def post(request):
 
 
 def live(request):
-    leaderboard = None
-    if os.path.exists(LEADERBOARD_PATH):
-        with open(LEADERBOARD_PATH, "r") as f:
-            leaderboard = json.load(f)
-
     return render(
-        request, "live.html", {"race_is_live": get_status(), "leaderboard": leaderboard}
+        request,
+        "live.html",
+        {"race_is_live": get_status(), "leaderboard": APP_STATE.leaderboard},
     )
 
 
@@ -192,7 +201,7 @@ def races(request):
 
 
 def get_status():
-    if os.path.exists(MAP_PATH) and os.path.exists(LEADERBOARD_PATH):
+    if APP_STATE.race_is_live and APP_STATE.leaderboard and os.path.exists(MAP_PATH):
         return True
     else:
-        return False
+        False
