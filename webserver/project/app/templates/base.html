@@ -28,20 +28,30 @@
       </button>
       <div class='collapse navbar-collapse' id='navbarCollapse'>
         <ul class='navbar-nav'>
+          <li class='nav-item'>
+            <a class='nav-link' href="https://t.me/fatracing">
+              <img src="{% static 'images/icon-tg.png' %}" alt="telegram" width="20" height="20">
+            </a>
+          </li>
+          <li class='nav-item'>
+            <a class='nav-link' href="https://instagram.com/fatracing">
+              <img src="{% static 'images/icon-ig.png' %}" alt="telegram" width="20" height="20">
+            </a>
+          </li>
+          <li class='nav-item'>
+            <a class='nav-link' href="https://vk.com/fatracing">
+              <img src="{% static 'images/icon-vk.png' %}" alt="telegram" width="20" height="20">
+            </a>
+          </li>
           {% if race_is_live %}
           <li class='nav-item'>
               <a class='nav-link' href="{% url 'app:live' %}">
                 <span class="position-relative" style="top: -2px;">{% bs_icon 'record2' size='1.5em' color='red' %}</span>
-                <span>Live</span>
+                <span>LIVE</span>
               </a>
             </span>
           </li>
           {% endif %}
-          <li class='nav-item'>
-            <a class='nav-link' href="{% url 'app:races' %}">
-              Гонки
-            </a>
-          </li>
         </ul>
         <ul class='navbar-nav ml-auto'>
           {% if user.is_superuser %}
@@ -65,9 +75,11 @@
       </ul>
       </div>
     </nav>
-    <div class='container-fluid'>
-      {% block content %}
-      {% endblock %}
-    </div>
+    {% block content %}
+    {% endblock %}
+    <p class="text-muted" style="text-align: center;">
+      fatracing © 2023<br>
+      made with ❤️ and 🪲 by <a href="https://t.me/iwatkot">iwatkot</a>
+    </p>
   </body>
 </html>

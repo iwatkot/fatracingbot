@@ -192,16 +192,16 @@ def live(request):
     )
 
 
-def race(request):
-    return render(request, "race.html")
+def tds(request):
+    return render(request, "tds.html")
 
 
-def races(request):
-    return render(request, "races.html")
+def tzar(request):
+    return render(request, "tzar.html")
 
 
 def get_status():
     if APP_STATE.race_is_live and APP_STATE.leaderboard and os.path.exists(MAP_PATH):
         return True
     else:
-        False
+        return False
