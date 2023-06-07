@@ -127,14 +127,12 @@ class Buttons(Enum):
     BTN_ACCOUNT = "Личный кабинет"
     BTN_DURING_RACE = "Во время гонки"
     BTN_EVENTS = "Мероприятия"
-    BTN_INFO = "Информация"
     BTN_MAIN = "Главное меню"
     BTN_ADMIN = "Администрирование"
 
     # * Account menu buttons.
     BTN_ACCOUNT_NEW = "Регистрация"
     BTN_ACCOUNT_INFO = "Мои данные"
-    BTN_ACCOUNT_RESULTS = "Мои результаты"
     BTN_ACCOUNT_EDIT = "Редактировать"
 
     # * During race menu buttons.
@@ -155,12 +153,11 @@ class Buttons(Enum):
     BTN_MANAGE_EVENTS = "Управление мероприятиями"
 
     # * Main menus.
-    MN_MAIN_USER = [BTN_ACCOUNT, BTN_DURING_RACE, BTN_EVENTS, BTN_INFO]
+    MN_MAIN_USER = [BTN_ACCOUNT, BTN_DURING_RACE, BTN_EVENTS]
     MN_MAIN_ADMIN = [
         BTN_ACCOUNT,
         BTN_DURING_RACE,
         BTN_EVENTS,
-        BTN_INFO,
         BTN_ADMIN,
     ]
 
@@ -168,7 +165,6 @@ class Buttons(Enum):
     MN_ACCOUNT_NEW = [BTN_ACCOUNT_NEW, BTN_MAIN]
     MN_ACCOUNT_EXIST = [
         BTN_ACCOUNT_INFO,
-        BTN_ACCOUNT_RESULTS,
         BTN_ACCOUNT_EDIT,
         BTN_MAIN,
     ]

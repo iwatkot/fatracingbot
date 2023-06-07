@@ -6,6 +6,8 @@ import shutil
 from datetime import datetime
 from collections import namedtuple, defaultdict
 
+import pandas as pd
+
 from mongoengine import (
     connect,
     Document,
@@ -18,6 +20,7 @@ from mongoengine import (
     ReferenceField,
     BooleanField,
     DictField,
+    SequenceField,
 )
 
 import globals as g
@@ -80,7 +83,10 @@ class Race(Document):
 
 
 class Payment(Document):
+    payment_id = SequenceField(sequence_name="payment_id", required=True, unique=True)
+
     telegram_id = IntField(required=True)
+    full_name = StringField(required=True)
     race = ReferenceField(Race, required=True)
     price = IntField(required=True)
     date = DateTimeField(required=True)
@@ -93,11 +99,25 @@ async def get_payment(telegram_id, race):
     return payment
 
 
-async def new_payment(telegram_id, race, price):
+async def verify_payment(payment_id):
+    payment = Payment.objects(payment_id=payment_id).first()
+    payment.update(verified=True)
+    payment.save()
+
+    return payment
+
+
+async def get_unverified_payments():
+    payments = Payment.objects(verified=False)
+    return payments
+
+
+async def new_payment(telegram_id, full_name, race, price):
     date = get_day().now
 
     payment = {
         "telegram_id": telegram_id,
+        "full_name": full_name,
         "race": race,
         "price": price,
         "date": date,
@@ -121,9 +141,6 @@ async def get_user(telegram_id):
 
 async def get_participant_info(race, telegram_id):
     for participant_info in race.participants_infos:
-        print(type(telegram_id), telegram_id)
-        print(type(participant_info["telegram_id"]), participant_info["telegram_id"])
-
         if participant_info["telegram_id"] == telegram_id:
             return participant_info["category"], participant_info["race_number"]
 
@@ -231,7 +248,9 @@ async def register_to_race(telegram_id, race_name, category):
             f"in category {category}."
         )
 
-        await new_payment(telegram_id, race, race.price)
+        full_name = f"{user.last_name} {user.first_name}"
+
+        await new_payment(telegram_id, full_name, race, race.price)
 
         res = True
     else:
@@ -286,6 +305,35 @@ async def close_registration(race):
     return race_number_data
 
 
+async def create_participants_table(race):
+    participants = race.participants
+    participants_infos = race.participants_infos
+
+    table_entries = []
+    for participant, participant_info in zip(participants, participants_infos):
+        entry = {
+            "Номер": participant_info["race_number"],
+            "Пол": participant.gender,
+            "Дата рождения": participant.birthday.strftime("%d.%m.%Y"),
+            "Категория": participant_info["category"],
+            "Полное имя": f"{participant.last_name} {participant.first_name}",
+            "Telegram ID": participant.telegram_id,
+            "Телефон": participant.phone,
+            "Email": participant.email,
+        }
+        table_entries.append(entry)
+
+    table_entries = sorted(table_entries, key=lambda x: x["Номер"])
+
+    df = pd.DataFrame(table_entries)
+    os.makedirs(g.TMP_DIR, exist_ok=True)
+    excel_path = os.path.join(g.TMP_DIR, "participants.xlsx")
+
+    df.to_excel(excel_path, index=False)
+
+    return excel_path
+
+
 def get_day(dt: str = None):
     Day = namedtuple("Day", ["begin", "now", "end"])
 
@@ -315,7 +363,7 @@ categories = [
     "М: МТБ",
     "Ж: МТБ",
 ]
-start = datetime.strptime("05.06.2023 20:00", "%d.%m.%Y %H:%M")
+start = datetime.strptime("07.06.2023 20:00", "%d.%m.%Y %H:%M")
 location = [58.64975393131507, 31.458961915652303]
 code = "TDS"
 distance = 125

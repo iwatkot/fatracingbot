@@ -20,6 +20,8 @@ os.makedirs(GH_DIR, exist_ok=True)
 TRACKS_DIR = os.path.join(WORKSPACE_PATH, "tracks")
 os.makedirs(TRACKS_DIR, exist_ok=True)
 
+TMP_DIR = os.path.join(WORKSPACE_PATH, "tmp")
+
 MAP_DIR = os.path.join(WORKSPACE_PATH, "map")
 os.makedirs(MAP_DIR, exist_ok=True)
 MAP_PATH = os.path.join(MAP_DIR, "map.html")

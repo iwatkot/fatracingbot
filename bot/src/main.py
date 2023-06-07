@@ -1,8 +1,10 @@
 import asyncio
 import secrets
+import os
 
 from datetime import datetime, timedelta
 from re import escape, match
+from collections import defaultdict
 
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher.filters import Text
@@ -126,16 +128,6 @@ async def button_admin(message):
 ################################
 ##### * Button handlers * ######
 ################################
-
-
-@dp.message_handler(Text(equals=Buttons.BTN_ACCOUNT_RESULTS.value))
-async def button_account_results(message):
-    await log_event(message)
-
-    await bot.send_message(
-        message.from_user.id,
-        "Функция в разработке",
-    )
 
 
 @dp.message_handler(Text(equals=Buttons.BTN_ACCOUNT_NEW.value))
@@ -575,24 +567,24 @@ async def callback_race_info(callback_query):
     user = await db.get_user(callback_query.from_user.id)
 
     if user in race.participants:
-        payment = await db.get_payment(callback_query.message.from_user.id, race)
+        payment = await db.get_payment(callback_query.from_user.id, race)
 
         if not payment:
-            text = " | оплата не подтверждена"
+            text = "🕒 Ожидается подтверждение оплаты"
         elif not payment.verified:
-            text = " | оплата не подтверждена"
+            text = "🕒 Ожидается подтверждение оплаты"
         else:
-            text = " | оплата подтверждена"
+            text = "✅ Оплата подтверждена"
 
-        buttons = {secrets.token_hex(10): "Вы зарегестрированы" + text}
+        buttons = {secrets.token_hex(10): text}
     elif race.registration_open:
         buttons = {
             f"race_choose_category_{race_name}": f"Регистрация на гонку ({race.price}₽)"
         }
     else:
-        buttons = {secrets.token_hex(10): "Регистрация закрыта"}
+        buttons = {secrets.token_hex(10): "⛔️ Регистрация закрыта"}
 
-    buttons[f"race_location_{race_name}"] = "Место старта"
+    buttons[f"race_location_{race_name}"] = "🧭 Место старта"
 
     reply_markup = await keyboard(buttons)
 
@@ -934,6 +926,46 @@ async def button_manage_race(message):
     )
 
 
+@dp.message_handler(Text(equals=Buttons.BTN_MANAGE_PAYMENTS.value))
+async def button_manage_payments(message):
+    await log_event(message)
+
+    if not await is_admin(message):
+        return
+
+    payments = await db.get_unverified_payments()
+    if not payments:
+        await bot.send_message(
+            message.from_user.id,
+            "Не найдено неподтвержденных платежей.",
+        )
+        return
+
+    races = defaultdict(list)
+    for payment in payments:
+        races[payment.race.name].append(payment)
+
+    for race in races:
+        reply = (
+            f"Неподтвержденные платежи для гонки {race}.\n\n"
+            f"Нажмите на платеж для подтверждения, пользователю будет отправлено уведомление.\n"
+        )
+        buttons = {}
+        for payment in races[race]:
+            date = payment.date.strftime("%d.%m.%Y %H:%M")
+            buttons[
+                f"payment_verify_{payment.payment_id}"
+            ] = f"{date} - {payment.full_name} - {payment.price} ₽"
+
+        reply_markup = await keyboard(buttons)
+
+        await bot.send_message(
+            message.from_user.id,
+            reply,
+            reply_markup=reply_markup,
+        )
+
+
 @dp.message_handler(Text(equals=Buttons.BTN_MANAGE_EVENTS.value))
 async def button_admin_events(message):
     await log_event(message)
@@ -954,6 +986,28 @@ async def button_admin_events(message):
 ################################
 #### * Callback handlers * #####
 ################################
+
+
+@dp.callback_query_handler(text_contains="payment_verify_")
+async def callback_payment_verify(callback_query):
+    await log_event(callback_query)
+
+    if not await is_admin(callback_query):
+        return
+
+    payment_id = callback_query.data.rsplit("_", 1)[-1]
+
+    payment = await db.verify_payment(payment_id)
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        "Платеж подтвержден.",
+    )
+
+    await bot.send_message(
+        payment.telegram_id,
+        f"Ваш платеж на сумму {payment.price} ₽ подтвержден.",
+    )
 
 
 @dp.callback_query_handler(text_contains="race_timekeeping_init_")
@@ -1103,6 +1157,16 @@ async def race_close_registration(callback_query):
     reply = escape(reply)
 
     await bot.send_message(callback_query.from_user.id, reply, parse_mode="MarkdownV2")
+
+    excel_table = await db.create_participants_table(race)
+
+    excel_file = types.InputFile(excel_table)
+    await bot.send_document(callback_query.from_user.id, excel_file)
+
+    try:
+        os.remove(excel_table)
+    except Exception:
+        pass
 
 
 ################################
