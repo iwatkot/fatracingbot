@@ -6,6 +6,9 @@ from datetime import datetime, timedelta
 from re import escape, match
 from collections import defaultdict
 
+import pandas as pd
+
+
 from aiogram import Bot, Dispatcher, executor, types
 from aiogram.dispatcher.filters import Text
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
@@ -911,13 +914,13 @@ async def button_manage_race(message):
     )
 
     buttons = {
-        f"race_start_init_{race.name}": "Запустить гонку",
-        f"race_timekeeping_init_{race.name}": "Фиксация результатов",
-        f"race_end_init_{race.name}": "Остановить гонку",
+        f"race_start_init_{race.name}": "▶️ Запустить гонку",
+        f"race_timekeeping_init_{race.name}": "🔢 Фиксация результатов",
+        f"race_end_init_{race.name}": "⏹️ Остановить гонку",
     }
 
     if g.AppState.Race.ongoing:
-        buttons[f"race_start_init_{race.name}"] = "Гонка уже запущена"
+        buttons[f"race_start_init_{race.name}"] = "✅ Гонка уже запущена"
 
     reply_markup = await keyboard(buttons)
 
@@ -1081,6 +1084,36 @@ async def callback_race_end_init(callback_query):
         )
 
         tr.make_post("race_state", "stop")
+
+    finishers = g.AppState.Race.finishers
+
+    if not finishers:
+        return
+
+    table_entries = []
+    for finisher in finishers:
+        race_number = finisher.get("race_number")
+        race_time = str(finisher.get("race_time"))
+        entry = {"Номер": race_number, "Время": race_time}
+        try:
+            entry["Категория"] = finisher["category"]
+            entry["Полное имя"] = finisher["full_name"]
+        except KeyError:
+            pass
+        table_entries.append(entry)
+
+    df = pd.DataFrame(table_entries)
+    os.makedirs(g.TMP_DIR, exist_ok=True)
+    excel_path = os.path.join(g.TMP_DIR, "finishers.xlsx")
+    df.to_excel(excel_path, index=False)
+
+    excel_file = types.InputFile(excel_path)
+    await bot.send_document(callback_query.from_user.id, excel_file)
+
+    try:
+        os.remove(excel_path)
+    except Exception:
+        pass
 
 
 @dp.callback_query_handler(text_contains="race_admin_info_")

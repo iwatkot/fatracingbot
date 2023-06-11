@@ -124,33 +124,33 @@ class Buttons(Enum):
     GENDERS = [BTN_GENDER_M, BTN_GENDER_F]
 
     # * Main menu buttons.
-    BTN_ACCOUNT = "Личный кабинет"
-    BTN_DURING_RACE = "Во время гонки"
-    BTN_EVENTS = "Мероприятия"
-    BTN_MAIN = "Главное меню"
-    BTN_ADMIN = "Администрирование"
+    BTN_ACCOUNT = "🎛️ Личный кабинет"
+    BTN_DURING_RACE = "🏁 Во время гонки"
+    BTN_EVENTS = "🗓️ Мероприятия"
+    BTN_MAIN = "🗂️ Главное меню"
+    BTN_ADMIN = "⚙️ Администрирование"
 
     # * Account menu buttons.
-    BTN_ACCOUNT_NEW = "Регистрация"
-    BTN_ACCOUNT_INFO = "Мои данные"
-    BTN_ACCOUNT_EDIT = "Редактировать"
+    BTN_ACCOUNT_NEW = "🆕 Регистрация"
+    BTN_ACCOUNT_INFO = "ℹ️ Мои данные"
+    BTN_ACCOUNT_EDIT = "📝 Редактировать"
 
     # * During race menu buttons.
-    BTN_TRANSLATION = "Трансляция геолокации"
-    BTN_LEADERBOARD = "Таблица лидеров"
-    BTN_YOUR_STATUS = "Ваши показатели"
-    BTN_NEED_HELP = "Мне нужна помощь"
+    BTN_TRANSLATION = "📡 Трансляция геолокации"
+    BTN_LEADERBOARD = "🏆 Таблица лидеров"
+    BTN_YOUR_STATUS = "📊 Ваши показатели"
+    BTN_NEED_HELP = "🆘 Мне нужна помощь"
 
     # * Events menu buttons.
-    UPCOMING_EVENTS = "Предстоящие гонки"
+    UPCOMING_EVENTS = "🚴‍♀️ Предстоящие гонки"
 
     # * Admin events menu buttons.
-    ADMIN_UPCOMING_EVENTS = "Созданные гонки"
+    ADMIN_UPCOMING_EVENTS = "🚴‍♂️ Созданные гонки"
 
     # * Admin menu buttons.
-    BTN_MANAGE_RACE = "Управление гонкой"
-    BTN_MANAGE_PAYMENTS = "Управление платежами"
-    BTN_MANAGE_EVENTS = "Управление мероприятиями"
+    BTN_MANAGE_RACE = "🏁 Управление гонкой"
+    BTN_MANAGE_PAYMENTS = "💵 Управление платежами"
+    BTN_MANAGE_EVENTS = "🗓️ Управление мероприятиями"
 
     # * Main menus.
     MN_MAIN_USER = [BTN_ACCOUNT, BTN_DURING_RACE, BTN_EVENTS]
