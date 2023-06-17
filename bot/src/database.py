@@ -352,36 +352,6 @@ def get_day(dt: str = None):
     return day
 
 
-name = "Тур де Селищи"
-categories = [
-    "М: ШОССЕ",
-    "Ж: ШОССЕ",
-    "М: ЦК",
-    "Ж: ЦК",
-    "М: ФИКС СИНГЛ",
-    "Ж: ФИКС СИНГЛ",
-    "М: МТБ",
-    "Ж: МТБ",
-]
-start = datetime.strptime("07.06.2023 20:00", "%d.%m.%Y %H:%M")
-location = [58.64975393131507, 31.458961915652303]
-code = "TDS"
-distance = 125
-price = 1000
-
-new_race = {
-    "name": name,
-    "start": start,
-    "location": location,
-    "code": code,
-    "categories": categories,
-    "distance": distance,
-    "price": price,
-}
-
-# Race(**new_race).save()
-
-
 # @crontab("0 1 * * *")
 async def backup():
     collection_names = sorted(
@@ -420,8 +390,6 @@ async def backup():
 
     with tarfile.open(tar_path, "w") as tar:
         tar.add(BACKUP_DIR, arcname="backup")
-
-    # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
     # TODO: somehow handle the backup file
 
