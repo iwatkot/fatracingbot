@@ -16,7 +16,7 @@ if os.getenv("APP_MODE") == "prod":
 else:
     DEBUG = True
 
-DEBUG = False
+DEBUG = True
 
 logger.info(f"Debug is set to: {DEBUG}")
 
@@ -115,7 +115,7 @@ logger.info(f"Lanuage code: {LANGUAGE_CODE}, time zone: {TIME_ZONE}")
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "static"),
+    os.path.join(BASE_DIR, "app", "static"),
 ]
 
 X_FRAME_OPTIONS = "SAMEORIGIN"
