@@ -55,10 +55,16 @@
         </ul>
         <ul class='navbar-nav ml-auto'>
           {% if user.is_superuser %}
-          <li class='nav-item'>
-            <a class='nav-link' href="{% url 'app:admin' %}">
+          <div class="dropdown">
+            <button class="btn btn-lg btn-sm dropdown-toggle position-relative" type="button" data-toggle="dropdown" aria-expanded="false" style="top: +5px;">
               Администрирование
-            </a>
+            </button>
+            <div class="dropdown-menu">
+              <a class="dropdown-item" href="{% url 'app:admin_events' %}">Мероприятия</a>
+              <a class="dropdown-item" href="#">Пользователи</a>
+              <a class="dropdown-item" href="#">Платежи</a>
+            </div>
+          </div>
           </li>
           {% endif %}
           {% if not user.is_authenticated and data_telegram_login %}

@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load bootstrap4 %}
+{% load static %}
+<div class="container-md">
+  <div class="jumbotron">
+    <h1 class="display-4">Новое мероприятие</h1>
+    <p class="lead">Заполните форму для создания новой гонки.</p>
+    <hr class="my-4">
+    <form method="post" action="{% url 'app:admin_new_event' %}" class="form">
+      {% csrf_token %}
+      {% bootstrap_form form %}
+      {% buttons %}
+        <button name='submit' class='btn btn-primary'>Создать гонку</button>
+      {% endbuttons %}
+    </form>
+  
+  </div>
+</div>
+{% endblock content %}

@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load static %}
+{% if context == 'created' %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <strong>Гонка успешно создана</strong>
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% endif %}
+<div class="container-md">
+  <div class="jumbotron">
+    <h1 class="display-4">Управление мероприятиями</h1>
+    <p class="lead">Редактирование существующих мероприятий и создание новых.</p>
+    <hr class="my-4">
+    <div class="btn-group" role="group">
+      <a class="btn btn-light" href="{% url 'app:admin_new_event' %}">Создать</a>
+      <a class="btn btn-light" href="#oncoming-events">Предстоящие</a>
+      <a class="btn btn-light" href="#ended-events">Прошедшие</a>
+    </div>
+    <br><br>
+    <div id="oncoming-events">
+      <h3>Предстоящие гонки</h1>
+    </div>
+    <br><br>
+    <div id="ended-events">
+      <h3>Прошедшие гонки</h1>
+    </div>
+  </div>
+</div>
+{% endblock content %}

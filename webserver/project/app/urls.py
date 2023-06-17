@@ -9,7 +9,8 @@ urlpatterns = [
     path("post/", views.post, name="post"),
     path("live/", views.live, name="live"),
     path("logout/", views.logout, name="logout"),
-    path("admin/", views.admin, name="admin"),
+    path("admin/events", views.admin_events, name="admin_events"),
+    path("admin/new_event", views.admin_new_event, name="admin_new_event"),
     path("tds/", views.tds, name="tds"),
     path("tzar/", views.tzar, name="tzar"),
 ]

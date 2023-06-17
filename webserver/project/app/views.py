@@ -10,7 +10,9 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 
 from .mongo import User as MongoUser
+from .mongo import Race as MongoRace
 from .utils import validate_login
+from .forms import NewRaceForm
 import globals as g
 
 logger = g.Logger(__name__)
@@ -47,8 +49,26 @@ def index(request):
 
 
 @user_passes_test(lambda u: u.is_superuser)
-def admin(request):
-    return render(request, "admin.html")
+def admin_events(request):
+    context = request.session.pop("context", None)
+
+    return render(request, "admin_events.html", {"context": context})
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def admin_new_event(request):
+    if request.method != "POST":
+        form = NewRaceForm()
+    else:
+        form = NewRaceForm(request.POST)
+        if form.is_valid():
+            form_data = form.cleaned_data
+            create_race(form_data)
+            request.session["context"] = "created"
+            return redirect("/admin/events")
+
+    context = {"form": form}
+    return render(request, "admin_new_event.html", context)
 
 
 def login(request):
@@ -205,3 +225,20 @@ def get_status():
         return True
     else:
         return False
+
+
+def create_race(form_data):
+    new_race = {
+        "name": form_data["name"],
+        "start": form_data["start"],
+        "location": [location.strip() for location in form_data["location"].split(",")],
+        "code": form_data["code"],
+        "categories": [
+            category.strip() for category in form_data["categories"].split(",")
+        ],
+        "distance": form_data["distance"],
+        "price": form_data["price"],
+        "registration_open": form_data["registration_open"],
+    }
+
+    MongoRace(**new_race).save()
