@@ -1,0 +1,22 @@
+version: '3'
+services:
+  bot:
+    image: iwatkot/frb:latest
+    container_name: frb
+    depends_on:
+      - webserver
+    networks:
+      - fn
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  webserver:
+    image: iwatkot/frs:latest
+    container_name: frs
+    ports:
+      - 80:80
+    networks:
+      - fn
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+networks:
+  fn:

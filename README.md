@@ -1,0 +1,1 @@
+<a href="https://codeclimate.com/github/iwatkot/fatracingbot/maintainability"><img src="https://api.codeclimate.com/v1/badges/e9cf9c37d546598db04c/maintainability" /></a>

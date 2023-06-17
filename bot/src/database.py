@@ -1,5 +1,12 @@
+import os
+import csv
+import tarfile
+import shutil
+
 from datetime import datetime
 from collections import namedtuple, defaultdict
+
+import pandas as pd
 
 from mongoengine import (
     connect,
@@ -13,6 +20,7 @@ from mongoengine import (
     ReferenceField,
     BooleanField,
     DictField,
+    SequenceField,
 )
 
 import globals as g
@@ -75,7 +83,10 @@ class Race(Document):
 
 
 class Payment(Document):
+    payment_id = SequenceField(sequence_name="payment_id", required=True, unique=True)
+
     telegram_id = IntField(required=True)
+    full_name = StringField(required=True)
     race = ReferenceField(Race, required=True)
     price = IntField(required=True)
     date = DateTimeField(required=True)
@@ -88,11 +99,25 @@ async def get_payment(telegram_id, race):
     return payment
 
 
-async def new_payment(telegram_id, race, price):
+async def verify_payment(payment_id):
+    payment = Payment.objects(payment_id=payment_id).first()
+    payment.update(verified=True)
+    payment.save()
+
+    return payment
+
+
+async def get_unverified_payments():
+    payments = Payment.objects(verified=False)
+    return payments
+
+
+async def new_payment(telegram_id, full_name, race, price):
     date = get_day().now
 
     payment = {
         "telegram_id": telegram_id,
+        "full_name": full_name,
         "race": race,
         "price": price,
         "date": date,
@@ -128,10 +153,6 @@ async def get_participant_by_race_number(race, race_number):
             return participant, participant_info["category"]
 
 
-async def get_user_by_fatracing_id(fatracing_id):
-    return User.objects(fatracing_id=fatracing_id).first()
-
-
 async def update_user(telegram_id, **kwargs):
     user = User.objects(telegram_id=telegram_id).first()
 
@@ -160,7 +181,7 @@ async def new_user(**kwargs):
 async def get_upcoming_races():
     day = get_day()
 
-    logger.debug(f"Trying to get list of upcoming races after {day.now}.")
+    logger.debug(f"Trying to get list of upcoming races after {day.begin}.")
 
     races = Race.objects(start__gte=day.now).order_by("start")
 
@@ -210,6 +231,7 @@ async def register_to_race(telegram_id, race_name, category):
     participant_info = {
         "telegram_id": telegram_id,
         "category": category,
+        "race_number": 0,
     }
 
     logger.debug(f"Prepared participant info: {participant_info}.")
@@ -226,7 +248,9 @@ async def register_to_race(telegram_id, race_name, category):
             f"in category {category}."
         )
 
-        await new_payment(telegram_id, race, race.price)
+        full_name = f"{user.last_name} {user.first_name}"
+
+        await new_payment(telegram_id, full_name, race, race.price)
 
         res = True
     else:
@@ -281,6 +305,35 @@ async def close_registration(race):
     return race_number_data
 
 
+async def create_participants_table(race):
+    participants = race.participants
+    participants_infos = race.participants_infos
+
+    table_entries = []
+    for participant, participant_info in zip(participants, participants_infos):
+        entry = {
+            "Номер": participant_info["race_number"],
+            "Пол": participant.gender,
+            "Дата рождения": participant.birthday.strftime("%d.%m.%Y"),
+            "Категория": participant_info["category"],
+            "Полное имя": f"{participant.last_name} {participant.first_name}",
+            "Telegram ID": participant.telegram_id,
+            "Телефон": participant.phone,
+            "Email": participant.email,
+        }
+        table_entries.append(entry)
+
+    table_entries = sorted(table_entries, key=lambda x: x["Номер"])
+
+    df = pd.DataFrame(table_entries)
+    os.makedirs(g.TMP_DIR, exist_ok=True)
+    excel_path = os.path.join(g.TMP_DIR, "participants.xlsx")
+
+    df.to_excel(excel_path, index=False)
+
+    return excel_path
+
+
 def get_day(dt: str = None):
     Day = namedtuple("Day", ["begin", "now", "end"])
 
@@ -299,13 +352,22 @@ def get_day(dt: str = None):
     return day
 
 
-name = "FATRACING RAZDELKA CUP"
-categories = ["М: ШОССЕ", "М: ЦК", "М: ФИКС СИНГЛ", "Ж: ЖЕНЩИНЫ"]
-start = datetime.strptime("28.05.2023 08:00", "%d.%m.%Y %H:%M")
-location = [58.46819985377836, 31.25682260802916]
-code = "RAZDELKA"
-distance = 20
-price = 100
+name = "Тур де Селищи"
+categories = [
+    "М: ШОССЕ",
+    "Ж: ШОССЕ",
+    "М: ЦК",
+    "Ж: ЦК",
+    "М: ФИКС СИНГЛ",
+    "Ж: ФИКС СИНГЛ",
+    "М: МТБ",
+    "Ж: МТБ",
+]
+start = datetime.strptime("07.06.2023 20:00", "%d.%m.%Y %H:%M")
+location = [58.64975393131507, 31.458961915652303]
+code = "TDS"
+distance = 125
+price = 1000
 
 new_race = {
     "name": name,
@@ -318,3 +380,49 @@ new_race = {
 }
 
 # Race(**new_race).save()
+
+
+# @crontab("0 1 * * *")
+async def backup():
+    collection_names = sorted(
+        cinfo.get_database(g.AppState.DataBase.db).list_collection_names()
+    )
+    collections = [Payment, Race, User]
+
+    if not len(collection_names) == len(collections):
+        logger.error(
+            "Created collections and collection names are not equal, backup stopped."
+        )
+        return
+
+    logger.info(f"Starting backup for collections: {collection_names}.")
+
+    TMP_DIR = os.path.join(g.WORKSPACE_PATH, "tmp")
+    BACKUP_DIR = os.path.join(TMP_DIR, "backup")
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+
+    for cname, cclass in zip(collection_names, collections):
+        logger.debug(f"Downloading collection {cname}.")
+
+        collection_path = os.path.join(BACKUP_DIR, cname)
+        os.makedirs(collection_path, exist_ok=True)
+        for document in cclass.objects:
+            document_path = os.path.join(collection_path, f"{document.id}.csv")
+            document_json = dict(document.to_mongo())
+            with open(document_path, "w") as f:
+                writer = csv.DictWriter(f, document_json.keys())
+                writer.writeheader()
+                writer.writerow(document_json)
+
+    logger.debug("Downloaded all documents in CSV format.")
+
+    tar_path = os.path.join(TMP_DIR, "backup.tar")
+
+    with tarfile.open(tar_path, "w") as tar:
+        tar.add(BACKUP_DIR, arcname="backup")
+
+    # timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    # TODO: somehow handle the backup file
+
+    shutil.rmtree(TMP_DIR)

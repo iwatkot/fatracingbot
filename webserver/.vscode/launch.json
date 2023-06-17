@@ -1,0 +1,14 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "FATRACING Webserver",
+            "type": "python",
+            "request": "launch",
+            "cwd": "${workspaceFolder}/project",
+            "program": "${workspaceFolder}/project/server.py",
+            "console": "integratedTerminal",
+            "python": "${workspaceFolder}/.venv/bin/python"
+        }
+    ]
+}

@@ -1,0 +1,85 @@
+{% load bootstrap4 %}
+{% load bootstrap_icons %}
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'images/apple-touch-icon.png' %}">
+    <link rel="icon" href="{% static 'images/favicon32.ico' %}" type="image/x-icon" sizes="32x32">
+    <link rel="icon" href="{% static 'images/favicon64.ico' %}" type="image/x-icon" sizes="64x64">
+    <link rel="icon" href="{% static 'images/favicon128.ico' %}" type="image/x-icon" sizes="128x128">
+    <meta charset='utf-8'>
+    <meta name='viewport' content='width=device_width, initial-scale=1, shrink-to-fit=no'>
+    <title>
+      FATRACING
+    </title>
+    {% bootstrap_css %}
+    {% bootstrap_javascript jquery='full' %}
+  </head>
+  <body>
+    <nav class='navbar navbar-expand-md navbar-light mb-4 border'>
+      <a class='navbar-brand' href="{% url 'app:index' %}">
+        <img src="{% static 'images/logo.svg' %}" alt="logo" width="160" height="30">
+      </a>
+      <button class='navbar-toggler' type='button' data-toggle='collapse'
+        data-target='#navbarCollapse' aria-controls='navbarCollapse'
+        aria-expanded='False' aria-label='Toggle navigation'>
+        <span class='navbar-toggler-icon'></span>
+      </button>
+      <div class='collapse navbar-collapse' id='navbarCollapse'>
+        <ul class='navbar-nav'>
+          <li class='nav-item'>
+            <a class='nav-link' href="https://t.me/fatracing">
+              <img src="{% static 'images/icon-tg.png' %}" alt="telegram" width="20" height="20">
+            </a>
+          </li>
+          <li class='nav-item'>
+            <a class='nav-link' href="https://instagram.com/fatracing">
+              <img src="{% static 'images/icon-ig.png' %}" alt="telegram" width="20" height="20">
+            </a>
+          </li>
+          <li class='nav-item'>
+            <a class='nav-link' href="https://vk.com/fatracing">
+              <img src="{% static 'images/icon-vk.png' %}" alt="telegram" width="20" height="20">
+            </a>
+          </li>
+          {% if race_is_live %}
+          <li class='nav-item'>
+              <a class='nav-link' href="{% url 'app:live' %}">
+                <span class="position-relative" style="top: -2px;">{% bs_icon 'record2' size='1.5em' color='red' %}</span>
+                <span>LIVE</span>
+              </a>
+            </span>
+          </li>
+          {% endif %}
+        </ul>
+        <ul class='navbar-nav ml-auto'>
+          {% if user.is_superuser %}
+          <li class='nav-item'>
+            <a class='nav-link' href="{% url 'app:admin' %}">
+              Администрирование
+            </a>
+          </li>
+          {% endif %}
+          {% if not user.is_authenticated and data_telegram_login %}
+          <li class='nav-item'>
+            <script async src="https://telegram.org/js/telegram-widget.js?22" data-userpic="false" data-telegram-login="{{ data_telegram_login }}" data-size="medium" data-auth-url="{{ data_auth_url }}" data-request-access="write"></script>
+          </li>
+          {% elif user.is_authenticated %}
+          <li class='nav-item'>
+            <a class='nav-link' href="{% url 'app:logout' %}">
+              Выход
+            </a>
+          </li>
+          {% endif %}
+      </ul>
+      </div>
+    </nav>
+    {% block content %}
+    {% endblock %}
+    <p class="text-muted" style="text-align: center;">
+      fatracing © 2023<br>
+      made with ❤️ and 🪲 by <a href="https://t.me/iwatkot">iwatkot</a>
+    </p>
+  </body>
+</html>

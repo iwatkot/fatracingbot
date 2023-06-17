@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block content %}
+{% load static %}
+{% if context == 'login' %}
+<div class="alert alert-success alert-dismissible fade show" role="alert">
+  <strong>Вы успешно авторизовались</strong>
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% elif context == 'logout' %}
+<div class="alert alert-info alert-dismissible fade show" role="alert">
+  <strong>Вы вышли из своей учетной записи</strong>
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% elif context == 'not_registered' %}
+<div class="alert alert-danger alert-dismissible fade show" role="alert">
+  <strong>Вы не зарегестрированы в Telegram боте.</strong> Пожалуйста, пройдите регистрацию в <a href="https://t.me/fatracingbot">@fatracingbot</a> и повторите попытку.
+  <button type="button" class="close" data-dismiss="alert" aria-label="Close">
+    <span aria-hidden="true">&times;</span>
+  </button>
+</div>
+{% endif %}
+<div class="container-md">
+  <div class="jumbotron">
+    <h1 class="display-4">FATRACING</h1>
+    <p class="lead">Проект, целью которого является проведение велогонок для любителей велосипеда на территории Новгородской Области.</p>
+    <hr class="my-4">
+  <div id="carouselExampleControls" class="carousel slide" data-ride="carousel">
+    <div class="carousel-inner">
+      <div class="carousel-item active">
+        <a href = "{% url 'app:tzar' %}">
+          <img class="d-block w-100" src="{% static 'images/banner-index-cg.png' %}" alt="Tzar greider">
+        </a>
+      </div>
+      <div class="carousel-item">
+        <a href = "{% url 'app:tds' %}">
+          <img class="d-block w-100" src="{% static 'images/banner-index-tds.png' %}" alt="Tour de Selishi">
+        </a>
+      </div>
+    </div>
+    <a class="carousel-control-prev" href="#carouselExampleControls" role="button" data-slide="prev">
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+      <span class="sr-only">Previous</span>
+    </a>
+    <a class="carousel-control-next" href="#carouselExampleControls" role="button" data-slide="next">
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+      <span class="sr-only">Next</span>
+    </a>
+  </div>
+  </div>
+</div>
+{% endblock %}

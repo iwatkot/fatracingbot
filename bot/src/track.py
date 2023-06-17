@@ -1,22 +1,32 @@
 import os
+import requests
+import json
+import shutil
+
 import gpxpy
 import folium
-import json
-from geopy.distance import geodesic
-from aiocron import crontab
-from git import Repo
 import numpy as np
+
+from aiocron import crontab
+from geopy.distance import geodesic
+from git import Repo
 
 import globals as g
 
 logger = g.Logger(__name__)
 
+POST_TOKEN = os.getenv("POST_TOKEN")
+POST_HOST = os.getenv("POST_HOST")
+
 
 async def download_gpx():
-    logger.info(f"Trying to download files from github repo {g.REPO_URL}.")
+    shutil.rmtree(g.GH_DIR)
+
+    repo_url = "https://github.com/iwatkot/fatracks.git"
+    logger.info(f"Trying to download files from github repo {repo_url}.")
 
     try:
-        Repo.clone_from(g.REPO_URL, g.GH_DIR)
+        Repo.clone_from(repo_url, g.GH_DIR)
         logger.info("GH directory cloned.")
     except Exception:
         repo = Repo(g.GH_DIR)
@@ -155,12 +165,10 @@ async def race_map_create():
             f"Added {user_info['full_name']} to leaderboard with distance {distance}."
         )
 
-    map_save_path = os.path.join(g.STATIC_DIR, f"{race_code}_map.html")
-
-    m.save(map_save_path)
+    m.save(g.MAP_PATH)
 
     logger.debug(
-        f"Map created, added {len(g.AppState.Race.location_data)} markers. Saved to {map_save_path}."
+        f"Map created, added {len(g.AppState.Race.location_data)} markers. Saved to {g.MAP_PATH}."
     )
 
     await build_leaderboard(raw_leaderboard)
@@ -186,12 +194,56 @@ async def build_leaderboard(raw_leaderboard):
             }
         )
 
-    logger.debug(f"Built leaderboard with {len(leaderboard)} entries.")
+    g.AppState.Race.leaderboard = leaderboard
 
-    race_code = g.AppState.Race.info.code
-    json_path = os.path.join(g.JSON_DIR, f"{race_code}_leaderboard_all.json")
+    logger.debug(
+        f"Built leaderboard with {len(leaderboard)} entries and saved it in global state."
+    )
 
-    with open(json_path, "w") as json_file:
-        json.dump(leaderboard, json_file, indent=2)
+    make_post("leaderboard", json=leaderboard)
+    make_post("map")
 
-    logger.info(f"Leaderboard saved to {json_path}.")
+
+def make_post(request_type, json=None):
+    url = f"{POST_HOST}/post/"
+
+    logger.debug(f"Sending POST request with {request_type} to {url}.")
+
+    headers = {
+        "Content-Type": "application/json",
+        "post-token": POST_TOKEN,
+        "request-type": request_type,
+    }
+    if json:
+        try:
+            response = requests.post(url, headers=headers, json=json)
+            logger.info(f"POST request with JSON sent with response: {response.text}")
+        except Exception:
+            logger.error("Error while sending POST request with JSON.")
+        return
+
+    elif request_type == "race_state":
+        try:
+            response = requests.post(url, headers=headers, json=json)
+        except Exception:
+            logger.error("Error while sending POST request with race state.")
+        return
+
+    else:
+        map_file = open(g.MAP_PATH, "rb")
+        files = {"map": map_file}
+        try:
+            response = requests.post(url, headers=headers, files=files)
+            logger.info(f"POST request with map sent with response: {response.text}")
+        except Exception:
+            logger.error("Error while sending POST request with map.")
+        return
+
+
+test_data = ["name", "distance", "race_number", "category", "row_number"]
+
+# while True:
+#    make_post("leaderboard", test_data)
+#    time.sleep(10)
+
+# make_post("map")
