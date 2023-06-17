@@ -9,3 +9,4 @@ maps/
 tracks/
 tracks_repo
 Bot/map/
+*.sqlite

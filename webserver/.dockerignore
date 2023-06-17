@@ -3,3 +3,4 @@ __pycache__/
 logs/
 .flake8
 dev.env
+*.sqlite3

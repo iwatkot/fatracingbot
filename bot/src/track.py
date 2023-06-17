@@ -16,6 +16,7 @@ import globals as g
 logger = g.Logger(__name__)
 
 POST_TOKEN = os.getenv("POST_TOKEN")
+POST_HOST = os.getenv("POST_HOST")
 
 
 async def download_gpx():
@@ -204,7 +205,7 @@ async def build_leaderboard(raw_leaderboard):
 
 
 def make_post(request_type, json=None):
-    url = "http://127.0.0.1/post/"
+    url = f"{POST_HOST}/post/"
 
     logger.debug(f"Sending POST request with {request_type} to {url}.")
 
