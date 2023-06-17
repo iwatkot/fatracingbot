@@ -19,7 +19,7 @@ DATA_TELEGRAM_LOGIN = os.getenv("AUTH_BOT_USERNAME")
 DATA_AUTH_URL = os.getenv("AUTH_REDIRECT")
 POST_TOKEN = os.getenv("POST_TOKEN")
 ADMINS = [int(admin) for admin in os.getenv("ADMINS").split(",")]
-MAP_PATH = os.path.join(settings.STATIC_ROOT, "map.html")
+MAP_PATH = os.path.join(settings.APP_STATIC_DIR, "map.html")
 
 
 class AppState:

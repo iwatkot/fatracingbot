@@ -110,10 +110,11 @@ USE_TZ = False
 
 logger.info(f"Lanuage code: {LANGUAGE_CODE}, time zone: {TIME_ZONE}")
 
+APP_STATIC_DIR = os.path.join(BASE_DIR, "app", "static")
 STATIC_URL = "/static/"
 STATIC_ROOT = os.path.join(BASE_DIR, "static")
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, "app", "static"),
+    APP_STATIC_DIR,
 ]
 
 X_FRAME_OPTIONS = "SAMEORIGIN"
