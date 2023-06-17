@@ -1,8 +1,10 @@
 version: '3'
 services:
   bot:
-    image: iwatkot/frb
+    image: iwatkot/frb:latest
     container_name: frb
+    restart: always
+    pull: always
     depends_on:
       - webserver
     networks:
@@ -10,8 +12,10 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
   webserver:
-    image: iwatkot/frs
+    image: iwatkot/frs:latest
     container_name: frs
+    restart: always
+    pull: always
     ports:
       - 80:80
     networks:
