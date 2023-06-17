@@ -1,3 +1,6 @@
+from datetime import datetime
+from collections import namedtuple
+
 from mongoengine import (
     Document,
     IntField,
@@ -52,3 +55,36 @@ class Race(Document):
     )
 
     ended = BooleanField(default=False)
+
+
+def create_race(form_data):
+    new_race = {
+        "name": form_data["name"],
+        "start": form_data["start"],
+        "location": [location.strip() for location in form_data["location"].split(",")],
+        "code": form_data["code"],
+        "categories": [
+            category.strip() for category in form_data["categories"].split(",")
+        ],
+        "distance": form_data["distance"],
+        "price": form_data["price"],
+        "registration_open": form_data["registration_open"],
+    }
+
+    Race(**new_race).save()
+
+
+def get_day(dt: str = None):
+    Day = namedtuple("Day", ["begin", "now", "end"])
+
+    if not dt:
+        dt = datetime.utcnow()
+    else:
+        dt = datetime.strptime(f"{dt} 00:00", "%d.%m.%Y %H:%M")
+
+    dts = datetime.combine(dt, datetime.min.time())
+    dte = datetime.combine(dt, datetime.max.time())
+
+    day = Day(dts, dt, dte)
+
+    return day

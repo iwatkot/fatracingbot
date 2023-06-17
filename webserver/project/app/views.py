@@ -10,7 +10,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 
 from .mongo import User as MongoUser
-from .mongo import Race as MongoRace
+from .mongo import create_race
 from .utils import validate_login
 from .forms import NewRaceForm
 import globals as g
@@ -225,20 +225,3 @@ def get_status():
         return True
     else:
         return False
-
-
-def create_race(form_data):
-    new_race = {
-        "name": form_data["name"],
-        "start": form_data["start"],
-        "location": [location.strip() for location in form_data["location"].split(",")],
-        "code": form_data["code"],
-        "categories": [
-            category.strip() for category in form_data["categories"].split(",")
-        ],
-        "distance": form_data["distance"],
-        "price": form_data["price"],
-        "registration_open": form_data["registration_open"],
-    }
-
-    MongoRace(**new_race).save()
