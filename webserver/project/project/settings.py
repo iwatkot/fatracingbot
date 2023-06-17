@@ -16,8 +16,6 @@ if os.getenv("APP_MODE") == "prod":
 else:
     DEBUG = True
 
-DEBUG = True
-
 logger.info(f"Debug is set to: {DEBUG}")
 
 HOST = os.getenv("HOST")
