@@ -1140,10 +1140,12 @@ async def callback_race_admin_info(callback_query):
 
     if status:
         buttons = {
-            f"race_close_registration_{race_name}": "Закрыть регистрацию",
+            f"race_close_registration_{race_name}": "⏹️ Закрыть регистрацию",
         }
     else:
-        buttons = {f"race_open_registration_{race_name}": "Открыть регистрацию"}
+        buttons = {f"race_open_registration_{race_name}": "▶️ Открыть регистрацию"}
+
+    buttons[f"race_change_price_{race_name}"] = f"💵 Изменить цену | {race.price} ₽"
 
     reply_markup = await keyboard(buttons)
 
@@ -1151,6 +1153,31 @@ async def callback_race_admin_info(callback_query):
         callback_query.from_user.id,
         reply,
         parse_mode="MarkdownV2",
+        reply_markup=reply_markup,
+    )
+
+
+@dp.callback_query_handler(text_contains="race_change_price_")
+async def race_change_price(callback_query):
+    await log_event(callback_query)
+
+    if not await is_admin(callback_query):
+        return
+
+    race_name = callback_query.data.rsplit("_", 1)[-1]
+    race = await db.get_upcoming_race_by_name(race_name)
+
+    g.AppState.Bot.race_to_edit = race
+
+    buttons = [Buttons.BTN_CANCEL.value]
+
+    reply_markup = await keyboard(buttons)
+
+    dp.register_message_handler(change_price)
+
+    await bot.send_message(
+        callback_query.from_user.id,
+        "Введите новую стоимость участия в гонке.",
         reply_markup=reply_markup,
     )
 
@@ -1205,6 +1232,31 @@ async def race_close_registration(callback_query):
 ################################
 ### * Registered handlers * ####
 ################################
+
+
+async def change_price(message):
+    await log_event(message)
+
+    if message.text == Buttons.BTN_CANCEL.value:
+        dp.message_handlers.unregister(change_price)
+        await button_admin(message)
+        return
+
+    try:
+        new_price = int(message.text)
+    except ValueError:
+        logger.error(f"Can't get price from {message.text}.")
+        return
+
+    race = g.AppState.Bot.race_to_edit
+    race.update(price=new_price)
+    race.save()
+
+    dp.message_handlers.unregister(change_price)
+
+    await bot.send_message(message.from_user.id, "Цена успешно изменена.")
+
+    await button_admin(message)
 
 
 async def timekeeping(message):

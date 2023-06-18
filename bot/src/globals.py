@@ -93,6 +93,7 @@ class State:
         def __init__(self):
             self.token = os.getenv("TOKEN")
             self.admins = [int(admin) for admin in os.getenv("ADMINS").split(",")]
+            self.race_to_edit = None
 
     class DataBase:
         def __init__(self):
