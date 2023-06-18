@@ -5,12 +5,13 @@ from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import user_passes_test
 from django.contrib import auth
 from django.contrib.auth.models import User
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, Http404, FileResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 
 from .mongo import User as MongoUser
-from .mongo import create_race
+from .mongo import Race
+from .mongo import create_race, get_races, create_participants_table
 from .utils import validate_login
 from .forms import NewRaceForm
 import globals as g
@@ -52,7 +53,30 @@ def index(request):
 def admin_events(request):
     context = request.session.pop("context", None)
 
-    return render(request, "admin_events.html", {"context": context})
+    upcoming_races = get_races("upcoming")
+    ended_races = get_races("ended")
+
+    return render(
+        request,
+        "admin_events.html",
+        {
+            "context": context,
+            "upcoming_races": upcoming_races,
+            "ended_races": ended_races,
+        },
+    )
+
+
+@user_passes_test(lambda u: u.is_superuser)
+def admin_event_download(request, race_id: str):
+    race = Race.objects(id=race_id).first()
+
+    table = create_participants_table(race)
+
+    response = FileResponse(
+        open(table, "rb"), as_attachment=True, filename="participants.xlsx"
+    )
+    return response
 
 
 @user_passes_test(lambda u: u.is_superuser)

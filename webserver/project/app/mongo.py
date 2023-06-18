@@ -1,5 +1,11 @@
+import os
+
 from datetime import datetime
 from collections import namedtuple
+
+from django.conf import settings
+
+import pandas as pd
 
 from mongoengine import (
     Document,
@@ -13,6 +19,8 @@ from mongoengine import (
     ReferenceField,
     DictField,
 )
+
+EXCEL_PATH = os.path.join(settings.APP_STATIC_DIR, "participants.xlsx")
 
 
 class User(Document):
@@ -88,3 +96,40 @@ def get_day(dt: str = None):
     day = Day(dts, dt, dte)
 
     return day
+
+
+def get_races(status: str):
+    day = get_day()
+
+    if status == "upcoming":
+        races = Race.objects(start__gte=day.now).order_by("start")
+    elif status == "ended":
+        races = Race.objects(start__lte=day.now).order_by("-start")
+
+    return races
+
+
+def create_participants_table(race):
+    participants = race.participants
+    participants_infos = race.participants_infos
+
+    table_entries = []
+    for participant, participant_info in zip(participants, participants_infos):
+        entry = {
+            "Номер": participant_info["race_number"],
+            "Пол": participant.gender,
+            "Дата рождения": participant.birthday.strftime("%d.%m.%Y"),
+            "Категория": participant_info["category"],
+            "Полное имя": f"{participant.last_name} {participant.first_name}",
+            "Telegram ID": participant.telegram_id,
+            "Телефон": participant.phone,
+            "Email": participant.email,
+        }
+        table_entries.append(entry)
+
+    table_entries = sorted(table_entries, key=lambda x: x["Номер"])
+
+    df = pd.DataFrame(table_entries)
+    df.to_excel(EXCEL_PATH, index=False)
+
+    return EXCEL_PATH

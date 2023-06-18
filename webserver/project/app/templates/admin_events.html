@@ -22,10 +22,46 @@
     <br><br>
     <div id="oncoming-events">
       <h3>Предстоящие гонки</h1>
+      {% for event in upcoming_races %}
+      <div class="card text-center">
+        <div class="card-header">
+          {{ event.code }}
+        </div>
+        <div class="card-body">
+          <h5 class="card-title">{{ event.name }}</h5>
+          <p class="card-text">Категории: {{event.categories }}</p>
+          <p class="card-text">Дистанция: {{event.distance }}</p>
+          <p class="card-text">Стоимость: {{event.price }}</p>
+          <a href="#" class="btn btn-primary">Редактировать</a>
+          <a href="{% url 'app:admin_event_download' race_id=event.id %}" class="btn btn-primary">Участники</a>
+        </div>
+        <div class="card-footer text-muted">
+          {{ event.start }}
+        </div>
+      </div>
+      {% endfor %}
     </div>
     <br><br>
     <div id="ended-events">
       <h3>Прошедшие гонки</h1>
+      {% for event in ended_races %}
+        <div class="card text-center">
+          <div class="card-header">
+            {{ event.code }}
+          </div>
+          <div class="card-body">
+            <h5 class="card-title">{{ event.name }}</h5>
+            <p class="card-text">Категории: {{event.categories }}</p>
+            <p class="card-text">Дистанция: {{event.distance }}</p>
+            <p class="card-text">Стоимость: {{event.price }}</p>
+            <a href="#" class="btn btn-primary">Редактировать</a>
+            <a href="{% url 'app:admin_event_download' race_id=event.id %}" class="btn btn-primary">Участники</a>
+          </div>
+          <div class="card-footer text-muted">
+            {{ event.start }}
+          </div>
+        </div>
+      {% endfor %}
     </div>
   </div>
 </div>
