@@ -18,6 +18,7 @@ from mongoengine import (
     BooleanField,
     ReferenceField,
     DictField,
+    SequenceField,
 )
 
 EXCEL_PATH = os.path.join(settings.APP_STATIC_DIR, "participants.xlsx")
@@ -63,6 +64,24 @@ class Race(Document):
     )
 
     ended = BooleanField(default=False)
+
+
+class Payment(Document):
+    payment_id = SequenceField(sequence_name="payment_id", required=True, unique=True)
+
+    telegram_id = IntField(required=True)
+    full_name = StringField(required=True)
+    race = ReferenceField(Race, required=True)
+    price = IntField(required=True)
+    date = DateTimeField(required=True)
+
+    verified = BooleanField(default=False)
+
+
+def get_payment_status(race: Race, telegram_id: int) -> bool | None:
+    payment = Payment.objects(race=race, telegram_id=telegram_id).first()
+    if payment:
+        return payment.verified
 
 
 def create_race(form_data):
@@ -115,6 +134,13 @@ def create_participants_table(race):
 
     table_entries = []
     for participant, participant_info in zip(participants, participants_infos):
+        telegram_id = participant.telegram_id
+        payment_status = get_payment_status(race, telegram_id)
+        if payment_status:
+            payment_status = "Оплачено"
+        else:
+            payment_status = "Не оплачено"
+
         entry = {
             "Номер": participant_info["race_number"],
             "Пол": participant.gender,
@@ -124,6 +150,7 @@ def create_participants_table(race):
             "Telegram ID": participant.telegram_id,
             "Телефон": participant.phone,
             "Email": participant.email,
+            "Оплата": payment_status,
         }
         table_entries.append(entry)
 
