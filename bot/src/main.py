@@ -569,7 +569,9 @@ async def callback_race_info(callback_query):
 
     user = await db.get_user(callback_query.from_user.id)
 
-    if user in race.participants:
+    if not user:
+        buttons = {secrets.token_hex(10): "⚠️ Зарегистрируйтесь в боте"}
+    elif user in race.participants:
         payment = await db.get_payment(callback_query.from_user.id, race)
 
         if not payment:
