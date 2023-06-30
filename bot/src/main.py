@@ -645,6 +645,13 @@ async def callback_race_register(callback_query):
     race_name, category = race_and_category_names.split(";")
 
     race = await db.get_upcoming_race_by_name(race_name)
+    user = await db.get_user(callback_query.from_user.id)
+
+    if user in race.participants:
+        logger.debug(
+            f"User with telegram ID {callback_query.from_user.id} already registered to race {race.name}!"
+        )
+        return
 
     if await db.register_to_race(callback_query.from_user.id, race_name, category):
         reply = Messages.PAYMENT_INSTRUCTIONS.format(
@@ -1148,6 +1155,7 @@ async def callback_race_admin_info(callback_query):
         buttons = {f"race_open_registration_{race_name}": "▶️ Открыть регистрацию"}
 
     buttons[f"race_change_price_{race_name}"] = f"💵 Изменить цену | {race.price} ₽"
+    buttons[f"race_remove_participant_{race_name}"] = "❌ Удалить участника"
 
     reply_markup = await keyboard(buttons)
 
@@ -1160,13 +1168,14 @@ async def callback_race_admin_info(callback_query):
 
 
 @dp.callback_query_handler(text_contains="race_change_price_")
+@dp.callback_query_handler(text_contains="race_remove_participant_")
 async def race_change_price(callback_query):
     await log_event(callback_query)
 
     if not await is_admin(callback_query):
         return
 
-    race_name = callback_query.data.rsplit("_", 1)[-1]
+    action, race_name = callback_query.data.rsplit("_", 1)
     race = await db.get_upcoming_race_by_name(race_name)
 
     g.AppState.Bot.race_to_edit = race
@@ -1175,13 +1184,23 @@ async def race_change_price(callback_query):
 
     reply_markup = await keyboard(buttons)
 
-    dp.register_message_handler(change_price)
+    if action == "race_change_price":
+        dp.register_message_handler(change_price)
 
-    await bot.send_message(
-        callback_query.from_user.id,
-        "Введите новую стоимость участия в гонке.",
-        reply_markup=reply_markup,
-    )
+        await bot.send_message(
+            callback_query.from_user.id,
+            "Введите новую стоимость участия в гонке.",
+            reply_markup=reply_markup,
+        )
+
+    elif action == "race_remove_participant":
+        dp.register_message_handler(remove_participant)
+
+        await bot.send_message(
+            callback_query.from_user.id,
+            "Введите Telegram ID участника, которого хотите снять с регистрации.",
+            reply_markup=reply_markup,
+        )
 
 
 @dp.callback_query_handler(text_contains="race_open_registration_")
@@ -1234,6 +1253,41 @@ async def race_close_registration(callback_query):
 ################################
 ### * Registered handlers * ####
 ################################
+
+
+async def remove_participant(message):
+    await log_event(message)
+
+    if message.text == Buttons.BTN_CANCEL.value:
+        dp.message_handlers.unregister(remove_participant)
+        await button_admin(message)
+        return
+
+    try:
+        participant_telegram_id = int(message.text)
+    except ValueError:
+        logger.error(f"Can't get participant_telegram_id from {message.text}.")
+        return
+
+    race = g.AppState.Bot.race_to_edit
+    res = await db.remove_participant(race, participant_telegram_id)
+
+    if not res:
+        await bot.send_message(
+            message.from_user.id,
+            f"Участник c Telegram ID: {participant_telegram_id} не найден.",
+        )
+        return
+
+    reply = "Участник успешно удален.\n\n"
+    for key, value in res.items():
+        reply += f"{key}: {value}\n"
+
+    dp.message_handlers.unregister(remove_participant)
+
+    await bot.send_message(message.from_user.id, reply)
+
+    await button_admin(message)
 
 
 async def change_price(message):

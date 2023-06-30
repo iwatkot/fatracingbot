@@ -139,6 +139,52 @@ async def get_user(telegram_id):
     return user
 
 
+async def remove_participant(race, telegram_id):
+    participant_info_idx = 0
+    participant_info_exists = False
+    for participant_info in race.participants_infos:
+        if participant_info["telegram_id"] == telegram_id:
+            participant_info_exists = True
+            break
+        participant_info_idx += 1
+
+    participant_idx = 0
+    participant_exists = False
+    for participant in race.participants:
+        if participant.telegram_id == telegram_id:
+            participant_exists = True
+            break
+        participant_idx += 1
+
+    if not participant_info_exists or not participant_exists:
+        return
+
+    info = {
+        "Telegram ID": participant.telegram_id,
+        "Имя": f"{participant.last_name} {participant.first_name}",
+        "Категория": participant_info["category"],
+    }
+
+    race.participants_infos.pop(participant_info_idx)
+    race.participants.pop(participant_idx)
+    race.save()
+
+    payment = await get_payment(telegram_id, race)
+
+    if payment:
+        info["Сумма платежа"] = payment.price
+        info["Дата платежа"] = payment.date.strftime("%d.%m.%Y %H:%M:%S")
+        info["Платеж подтвержден"] = (
+            "Подтвержден" if payment.verified else "Не подтвержден"
+        )
+
+        payment.delete()
+    else:
+        info["Платеж"] = "Не найден"
+
+    return info
+
+
 async def get_participant_info(race, telegram_id):
     for participant_info in race.participants_infos:
         if participant_info["telegram_id"] == telegram_id:
